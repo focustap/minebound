@@ -52,7 +52,8 @@ public final class SkillGraph {
                 new String[]{"attr:CON", "shield", "heal", "resist", "attr:WIS"});
         branch(nodes, CharacterClass.PALADIN, "retribution", "Retribution", 151, 4, Ability.SMITE,
                 new String[]{"attr:STR", "bash", "shield", "vulnerable", "attr:WIS"});
-        branch(nodes, CharacterClass.WARLOCK, "psychic_blade", "Psychic Blade", 177, 5, Ability.PSYCHIC_BLADE,
+        // Keep stable save IDs while presenting this optional specialization as Bladeslinger.
+        branch(nodes, CharacterClass.WARLOCK, "psychic_blade", "Bladeslinger", 177, 5, Ability.PSYCHIC_BLADE,
                 new String[]{"attr:CHA", "bash", "pact", "hp", "attr:CHA"});
         branch(nodes, CharacterClass.WARLOCK, "destruction", "Destruction", 199, 5, Ability.EMBER_NOVA,
                 new String[]{"attr:CHA", "spell", "pp", "efficiency", "attr:CHA"});
@@ -101,9 +102,18 @@ public final class SkillGraph {
     }
     public static boolean purchase(CharacterProfile p, String id) {
         Node n = NODES.get(id);
-        if (!p.created || n == null || p.nodes.contains(id) || p.skillPoints < n.cost || !reachable(p,n)) return false;
-        if (n.ability != null && p.nodes.stream().map(NODES::get).filter(Objects::nonNull).filter(x -> x.ability == null).count() < 5) return false;
+        if (n == null || !purchaseBlocker(p,n).isEmpty()) return false;
         p.skillPoints -= n.cost; p.nodes.add(id); return true;
+    }
+    /** Shared by server validation and the web's button/inspector. Empty means buyable. */
+    public static String purchaseBlocker(CharacterProfile p, Node n) {
+        if (!p.created) return "Create a character first.";
+        if (p.nodes.contains(n.id)) return "Already learned.";
+        if (!reachable(p,n)) return "Learn a connected node first.";
+        long passives = p.nodes.stream().map(NODES::get).filter(Objects::nonNull).filter(x -> x.ability == null).count();
+        if (n.ability != null && passives < 5) return "Learn " + (5-passives) + " more passive nodes first.";
+        if (p.skillPoints < n.cost) return "Need " + n.cost + " SP; you have " + p.skillPoints + ".";
+        return "";
     }
     public static int bonus(CharacterProfile p, String effect) {
         return p.nodes.stream().map(NODES::get).filter(Objects::nonNull).filter(n -> effect.equals(n.effect)).mapToInt(Node::value).sum();

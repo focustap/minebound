@@ -4,6 +4,8 @@
 
 Version 0.3 adds original forest-map, arcane-web and folio PNG backgrounds, custom pixel-framed controls, code-drawn skill/map icons and an original reset seal. See [prompts and asset paths](../art/UI_ART.md) and [in-game screenshots](screenshots/world-map.png). Supplied enemy textures use isolated frame PNGs, two-pixel transparent gutters and explicit nearest/clamp metadata.
 
+The 0.3.1 visual pass retires the folio and decorative web backgrounds from active screens (source PNGs remain archived). Text and controls use bounded obsidian panels, lavender edges and gold corners. Only the map uses the forest painting; combat uses a plain dark stage behind the enemy. The web opens to a readable horizontal specialization with an inspector and shared server/UI lock rules. The custom two-block altar uses original cuboid/rotated-crystal geometry and existing Minecraft deepslate, gold and amethyst textures; it needs no external model loader or generated raster art. See [altar in game](screenshots/altar.png).
+
 ## Palette (hex)
 - Ink: #171426
 - Deep plum: #2B2444

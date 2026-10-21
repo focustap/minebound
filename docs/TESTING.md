@@ -1,4 +1,4 @@
-# Testing Minebound 0.3
+# Testing Minebound 0.3.1
 
 ## Automated checks
 
@@ -6,7 +6,7 @@
 .\gradlew.bat clean build
 ```
 
-The normal build runs **30 JUnit tests**: creation and all race/class combinations, exhaustive legal creation resource ranges, first-clear XP/leveling, legacy data, current-resource reloads, one-time/rollback-safe recovery, duplicate activity awards and budgets, graph connectivity/hybrids, Wizard multi-encounter resource balance, Warlock sustain limits, net spell costs, reset aggregate reload, targeting/camping, boss phases/durability, collision and sprite gutters.
+The normal build runs **31 JUnit tests**: creation and all race/class combinations, exhaustive legal creation resource ranges, first-clear XP/leveling, legacy data, current-resource reloads, one-time/rollback-safe recovery, duplicate activity awards and budgets, graph connectivity/hybrids, Wizard multi-encounter resource balance, Warlock starter/CHA scaling/Bladeslinger unlock preservation, sustain limits, net spell costs, reset aggregate reload, targeting/camping, boss phases/durability, collision and sprite gutters.
 
 An opt-in **real Minecraft client/integrated-server scenario** creates its own throwaway world and operates the actual screens and network handlers:
 
@@ -16,7 +16,11 @@ An opt-in **real Minecraft client/integrated-server scenario** creates its own t
 
 It verifies altar opening, story/creation and the single initial point, a graph purchase, server-resolved spell use, resource carryover after closing/reopening, eligible recovery, natural-ore event XP, personal hostile-kill XP, right-click harvest/replant deduplication, the normal fishing event path, disk reload, victory without refilling, out-of-combat goods after settlement, reset cancellation, full reset reload, and vanilla inventory isolation. The right-click and fishing fixtures post the corresponding server events rather than wait for random catches or install a third-party harvesting mod. A failing assertion makes the Gradle task fail. QA sources are excluded from normal builds.
 
-Captured screenshots are written to `run/screenshots/minebound-*.png`; selected previews are checked into `docs/screenshots`. The full integrated scenario passed during this change. A dedicated `--initSettings` bootstrap also completed without a client-class error:
+Captured screenshots are written to `run/screenshots/minebound-*.png`; selected previews are checked into `docs/screenshots`. The full integrated scenario passed during this change.
+
+The 0.3.1 visual scenario additionally uses actual mouse press/release dispatch (rather than invoking button callbacks) at 854x480/GUI 2 and 1280x800/GUI 3. It creates a Warlock, verifies Eldritch Blast replaces implicit Psychic Blade, buys a Bladeslinger node, repeatedly navigates sheet/web/map/lore/goods without reopening, and starts/operates a second battle after victory. It captures the plain battle stage, visible scaling, bounded text and new layout. It places the tall altar through its item, rejects an obstructed ceiling, checks legacy single-block survival on neighbor updates, and breaks the upper half in Survival to verify one item and no orphan base.
+
+A dedicated `--initSettings` bootstrap also completed without a client-class error:
 
 ```powershell
 .\gradlew.bat -PmineboundServerSmoke runServer
@@ -50,7 +54,7 @@ Generic right-click state-transition compatibility is implemented and covered by
 3. Allow 24,000 Overworld simulation ticks to pass (approximately 20 minutes at 20 TPS). When outside an active encounter, the next recovery check restores both resources and displays a notice. A second immediate check must not restore anything again.
 4. If the interval becomes eligible during a fight, recovery waits until the encounter is closed/settled. Paused/stopped single-player time does not advance the interval.
 5. Use a map herb after a completed/failed battle: its healing must remain saved rather than being replaced by the old battle snapshot. Check Undead's healing reduction.
-6. Wizard: try Arcane efficiency and INT improvements over consecutive first clears, using earned ethers strategically. The resource simulation verifies a spell-focused World 1 route without daily rest. Warlock: compare CHA-based BASH, Psychic Blade's next-BASH combo and the finite 12-PP daily pact budget. Retreat/re-entry must not refresh Still Mind or that budget.
+6. Wizard: try Arcane efficiency and INT improvements over consecutive first clears, using earned ethers strategically. The resource simulation verifies a spell-focused World 1 route without daily rest. Warlock: start with CHA-based Eldritch Blast, then compare CHA-based BASH, unlocked Bladeslinger/Psychic Blade's next-BASH combo and the finite 12-PP daily pact budget. Retreat/re-entry must not refresh Still Mind or that budget.
 
 ## Test the Reset Relic
 

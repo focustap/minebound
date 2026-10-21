@@ -8,6 +8,21 @@ import org.junit.jupiter.api.io.TempDir;
 
 class ExpansionRulesTest {
     @TempDir Path temp;
+    @Test void warlockStartsWithChaBlastAndLearnsPsychicBladeThroughStableBladeslingerNodes() throws Exception {
+        CharacterProfile p=CharacterRulesTest.character(Race.HUMAN,CharacterClass.WARLOCK);
+        assertTrue(p.abilities().contains(Ability.ELDRITCH_BLAST)); assertFalse(p.abilities().contains(Ability.PSYCHIC_BLADE));
+        int damage=CombatRules.abilityDamage(p,Ability.ELDRITCH_BLAST); p.attributes[Attribute.CHA.ordinal()]+=2;
+        assertEquals(damage+2,CombatRules.abilityDamage(p,Ability.ELDRITCH_BLAST));
+        assertEquals(Attribute.CHA,CombatRules.bashScaling(p));
+        var active=SkillGraph.NODES.get("psychic_blade_6"); assertEquals("Bladeslinger",active.branch());
+        p.nodes.add("psychic_blade_5"); p.skillPoints=10;
+        assertTrue(SkillGraph.purchaseBlocker(p,active).contains("4 more passive")); assertFalse(SkillGraph.purchase(p,active.id()));
+        p.nodes.addAll(List.of("psychic_blade_1","psychic_blade_2","psychic_blade_3","psychic_blade_4"));
+        assertEquals("",SkillGraph.purchaseBlocker(p,active)); assertTrue(SkillGraph.purchase(p,active.id()));
+        assertTrue(p.abilities().contains(Ability.PSYCHIC_BLADE));
+        ProfileStore store=new ProfileStore(temp.resolve("warlock.json")); store.save(p);
+        assertTrue(store.load().abilities().contains(Ability.PSYCHIC_BLADE));
+    }
     @Test void hpAndPpCarryAcrossVictoriesRetreatsAndReloads() throws Exception {
         CharacterProfile p=CharacterRulesTest.character(Race.ELF,CharacterClass.WIZARD);
         Recovery.initialize(p,100); p.currentHp=17; p.currentPp=11;

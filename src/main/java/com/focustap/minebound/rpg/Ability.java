@@ -22,7 +22,8 @@ public enum Ability {
     REJUVENATE(CharacterClass.DRUID, Attribute.WIS, 5, "Three rounds of limited restorative healing."),
     SMITE(CharacterClass.PALADIN, Attribute.WIS, 4, "Holy damage and a modest shield."),
     CANTRIP(CharacterClass.WIZARD, Attribute.INT, 0, "Small free spell, unlocked deep in Arcane; consumes a turn."),
-    MEDITATE(CharacterClass.WIZARD, Attribute.WIS, 0, "Once per recovery day, restore 4 PP and face an enemy turn.");
+    MEDITATE(CharacterClass.WIZARD, Attribute.WIS, 0, "Once per recovery day, restore 4 PP and face an enemy turn."),
+    ELDRITCH_BLAST(CharacterClass.WARLOCK, Attribute.CHA, 2, "A bolt of pact energy. Warlock's starting spell; damage scales with CHA.");
 
     public final CharacterClass path;
     public final Attribute scaling;
@@ -32,4 +33,5 @@ public enum Ability {
         this.path = path; this.scaling = scaling; this.cost = cost; this.description = description;
     }
     public String label() { return name().replace('_', ' '); }
+    public boolean startsUnlocked() { return ordinal() <= MEND.ordinal() || this == ELDRITCH_BLAST; }
 }

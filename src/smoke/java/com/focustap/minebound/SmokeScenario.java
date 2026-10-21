@@ -56,7 +56,8 @@ public final class SmokeScenario {
         Button button=mc.screen.children().stream().filter(c -> c instanceof Button).map(c -> (Button)c)
                 .filter(b -> b.active && b.getMessage().getString().startsWith(label)).findFirst()
                 .orElseThrow(() -> new IllegalStateException("Missing button "+label+" in "+mc.screen.getClass().getSimpleName()));
-        button.onPress();
+        check(mc.screen.mouseClicked(button.getX()+button.getWidth()/2.,button.getY()+button.getHeight()/2.,0),"Click was not handled: "+label);
+        if (mc.screen!=null) mc.screen.mouseReleased(button.getX()+button.getWidth()/2.,button.getY()+button.getHeight()/2.,0);
     }
     private static void shot(String name) {
         Minecraft mc=Minecraft.getInstance();
@@ -122,11 +123,12 @@ public final class SmokeScenario {
                 case 9 -> {
                     check(mc.screen instanceof SkillWebScreen,"Web not open"); shot("06-web");
                     var screen=(SkillWebScreen)mc.screen;
-                    var sx=SkillWebScreen.class.getDeclaredMethod("sx",float.class); sx.setAccessible(true);
-                    var sy=SkillWebScreen.class.getDeclaredMethod("sy",float.class); sy.setAccessible(true);
+                    var sx=SkillWebScreen.class.getDeclaredMethod("nx",SkillGraph.Node.class); sx.setAccessible(true);
+                    var sy=SkillWebScreen.class.getDeclaredMethod("ny",SkillGraph.Node.class); sy.setAccessible(true);
                     var node=SkillGraph.NODES.get("arcane_1");
-                    screen.mouseClicked((int)sx.invoke(screen,node.x()),(int)sy.invoke(screen,node.y()),0);
-                    press("BUY:"); advance();
+                    screen.mouseClicked((int)sx.invoke(screen,node),(int)sy.invoke(screen,node),0);
+                    screen.mouseReleased((int)sx.invoke(screen,node),(int)sy.invoke(screen,node),0);
+                    press("LEARN /"); advance();
                 }
                 case 10 -> {
                     check(snapshot.profile().nodes.contains("arcane_1"),"Server skill purchase failed");
@@ -236,10 +238,90 @@ public final class SmokeScenario {
                 case 25 -> {
                     if (!serverDone) return;
                     System.out.println("MINEBOUND_SMOKE PASSED: altar, creation, graph purchase, battle authority, HP/PP persistence, recovery, mining, hostile kills, fishing, right-click harvest dedup, disk reload, reset cancellation/isolation.");
-                    result(mc,"PASS");
-                    shot("13-reset-complete"); advance();
+                    shot("13-reset-complete"); press("SKIP"); advance();
                 }
-                case 26 -> mc.stop();
+                case 26 -> {
+                    org.lwjgl.glfw.GLFW.glfwSetWindowSize(mc.getWindow().getWindow(),1280,800);
+                    mc.options.guiScale().set(3); mc.resizeDisplay(); mc.getToasts().clear();
+                    press("Elf"); press("NEXT"); press("Warlock"); advance();
+                }
+                case 27 -> {
+                    shot("14-warlock-class"); press("NEXT"); var screen=(RetroScreen)mc.screen;
+                    for (int row : new int[]{98,164}) for (int i=0;i<6;i++) {
+                        screen.mouseClicked(screen.x()+142,screen.y()+row,0); screen.mouseReleased(screen.x()+142,screen.y()+row,0);
+                    }
+                    advance();
+                }
+                case 28 -> { shot("15-warlock-stats"); press("NEXT"); press("CONFIRM"); advance(); }
+                case 29 -> {
+                    check(snapshot.profile().startingClass==CharacterClass.WARLOCK,"Warlock creation");
+                    check(snapshot.profile().abilities().contains(Ability.ELDRITCH_BLAST),"Eldritch starter missing");
+                    check(!snapshot.profile().abilities().contains(Ability.PSYCHIC_BLADE),"Psychic Blade should require Bladeslinger");
+                    shot("16-world-map"); press("SHEET"); advance();
+                }
+                case 30 -> { shot("17-warlock-sheet"); press("SKILL WEB"); advance(); }
+                case 31 -> { shot("18-bladeslinger"); press("LEARN /"); advance(); }
+                case 32 -> {
+                    check(snapshot.profile().nodes.contains("psychic_blade_1"),"Bladeslinger node missing");
+                    press("BACK"); press("MAP"); press("SHEET"); press("SKILL WEB"); press("BACK"); press("MAP"); press("LORE"); advance();
+                }
+                case 33 -> { shot("19-lore"); press("MAP"); press("GOODS"); advance(); }
+                case 34 -> { shot("20-goods"); press("BACK"); press("ENTER"); advance(); }
+                case 35 -> { check(snapshot.battle().state==Battle.State.COMMAND,"Battle did not open"); shot("21-warlock-battle"); press("ABILITY"); advance(); }
+                case 36 -> { shot("22-eldritch-scaling"); press("ELDRITCH BLAST"); advance(); }
+                case 37 -> {
+                    check(snapshot.battle().state==Battle.State.DODGE,"Eldritch Blast did not work");
+                    server(p -> { var s=CharacterService.session(p); s.battle.state=Battle.State.COMMAND; s.battle.enemyHp=1; CharacterService.sync(p,s,"UPDATE"); }); advance();
+                }
+                case 38 -> { press("BASH"); advance(); }
+                case 39 -> { check(snapshot.battle().state==Battle.State.WON,"Victory fixture failed"); shot("23-results"); press("WORLD MAP"); press("ENTER"); advance(); }
+                case 40 -> {
+                    check(snapshot.battle().state==Battle.State.COMMAND,"Repeat battle did not open");
+                    press("ABILITY"); press("BACK"); press("DEFEND"); advance();
+                }
+                case 41 -> {
+                    check(snapshot.battle().state==Battle.State.DODGE,"Repeat battle buttons stuck"); shot("24-dodge"); mc.screen.onClose();
+                    server(p -> {
+                        p.setGameMode(GameType.CREATIVE);
+                        var level=p.serverLevel(); BlockPos base=p.blockPosition().offset(0,0,5);
+                        for (int dx=-4;dx<=4;dx++) for (int dz=-4;dz<=4;dz++) for (int dy=-1;dy<=4;dy++)
+                            level.setBlockAndUpdate(base.offset(dx,dy,dz),dy==-1 ? Blocks.STONE_BRICKS.defaultBlockState() : Blocks.AIR.defaultBlockState());
+                        level.setDayTime(6000);
+                        BlockPos legacy=base.offset(-3,0,0); level.setBlockAndUpdate(legacy,Minebound.ALTAR.get().defaultBlockState());
+                        level.setBlockAndUpdate(legacy.above(),Blocks.DIRT.defaultBlockState()); level.setBlockAndUpdate(legacy.above(),Blocks.AIR.defaultBlockState());
+                        check(level.getBlockState(legacy).is(Minebound.ALTAR.get()),"Legacy single-block altar disappeared on neighbor update");
+                        level.setBlockAndUpdate(legacy,Blocks.AIR.defaultBlockState());
+                        BlockPos blocked=base.offset(3,0,0); level.setBlockAndUpdate(blocked.above(),Blocks.STONE.defaultBlockState());
+                        var item=new ItemStack(Minebound.ALTAR_ITEM.get()); p.setItemInHand(InteractionHand.MAIN_HAND,item);
+                        var context=new net.minecraft.world.item.context.BlockPlaceContext(p,InteractionHand.MAIN_HAND,item,new BlockHitResult(Vec3.atCenterOf(base.below()),Direction.UP,base.below(),false));
+                        check(((net.minecraft.world.item.BlockItem)item.getItem()).place(context).consumesAction(),"Altar item placement");
+                        check(level.getBlockState(base.above()).is(Minebound.ALTAR.get()),"Altar upper half missing");
+                        check(level.getBlockState(base.above()).getValue(AltarBlock.HALF)==net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER,"Altar upper state");
+                        var blockedContext=new net.minecraft.world.item.context.BlockPlaceContext(p,InteractionHand.MAIN_HAND,item,new BlockHitResult(Vec3.atCenterOf(blocked.below()),Direction.UP,blocked.below(),false));
+                        check(Minebound.ALTAR.get().getStateForPlacement(blockedContext)==null,"Altar placed through a ceiling");
+                        p.teleportTo(p.serverLevel(),base.getX()+3.5,base.getY()+.3,base.getZ()-4.5,java.util.Set.of(),32,0);
+                        p.setItemInHand(InteractionHand.MAIN_HAND,ItemStack.EMPTY);
+                    }); mc.options.hideGui=true; advance(); wait=60;
+                }
+                case 42 -> { shot("25-altar-model"); mc.options.hideGui=false;
+                    server(p -> {
+                        var level=p.serverLevel(); BlockPos base=p.blockPosition().offset(0,0,3);
+                        var lower=Minebound.ALTAR.get().defaultBlockState();
+                        level.setBlock(base,lower,3); Minebound.ALTAR.get().setPlacedBy(level,base,lower,p,new ItemStack(Minebound.ALTAR_ITEM.get()));
+                        p.setGameMode(GameType.SURVIVAL);
+                        var upper=level.getBlockState(base.above()); Minebound.ALTAR.get().playerWillDestroy(level,base.above(),upper,p);
+                        level.setBlockAndUpdate(base.above(),Blocks.AIR.defaultBlockState());
+                        check(level.getBlockState(base).isAir(),"Altar left an orphan base");
+                        long drops=level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,new net.minecraft.world.phys.AABB(base).inflate(1)).stream()
+                                .filter(e -> e.getItem().is(Minebound.ALTAR_ITEM.get())).mapToInt(e -> e.getItem().getCount()).sum();
+                        check(drops==1,"Breaking upper half must drop exactly one altar, got "+drops);
+                    }); advance();
+                }
+                case 43 -> {
+                    if (!serverDone) return;
+                    result(mc,"PASS"); System.out.println("MINEBOUND_VISUAL PASSED: Warlock starter, Bladeslinger, real mouse navigation, repeat battle, tall altar placement/ceiling/break/drop."); advance();
+                }
+                case 44 -> mc.stop();
             }
         } catch (Throwable e) { failure=e; }
     }

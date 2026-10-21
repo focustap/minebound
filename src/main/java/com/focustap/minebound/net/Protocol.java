@@ -33,7 +33,7 @@ public final class Protocol {
         @Override public Type<Update> type() { return TYPE; }
     }
     public static void register(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("3");
+        var registrar = event.registrar("4");
         registrar.playToServer(Command.TYPE,Command.CODEC,(p,c) -> {
             if (c.player() instanceof ServerPlayer player) CharacterService.command(player,p);
         });

@@ -6,7 +6,7 @@ public enum CharacterClass {
     WIZARD("Wizard", Attribute.INT, 25, 40, "Channeling: offensive spells +2 damage.", "SPARK"),
     DRUID("Druid", Attribute.WIS, 27, 11, "Growth: restorative spells heal 2 extra HP.", "BRAMBLE"),
     PALADIN("Paladin", Attribute.CON, 31, 8, "Bulwark: take 1 less damage while guarding.", "WARD"),
-    WARLOCK("Warlock", Attribute.CHA, 27, 18, "Pact blade: third BASH restores 1 PP, up to 12/day.", "PSYCHIC BLADE");
+    WARLOCK("Warlock", Attribute.CHA, 27, 18, "Pact: third BASH restores 1 PP, up to 12/day.", "ELDRITCH BLAST");
 
     public final String label, passive, ability;
     public final Attribute primary;

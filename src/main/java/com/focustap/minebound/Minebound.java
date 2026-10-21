@@ -24,7 +24,7 @@ public final class Minebound {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MOD_ID);
 
     public static final DeferredBlock<AltarBlock> ALTAR = BLOCKS.registerBlock(
-            "altar", AltarBlock::new, BlockBehaviour.Properties.of().strength(2.5f, 6.0f).sound(SoundType.AMETHYST)
+            "altar", AltarBlock::new, BlockBehaviour.Properties.of().strength(2.5f, 6.0f).sound(SoundType.AMETHYST).noOcclusion().lightLevel(s -> 7)
     );
     public static final DeferredItem<?> ALTAR_ITEM = ITEMS.registerSimpleBlockItem("altar", ALTAR);
     public static final DeferredItem<ResetRelic> RESET_RELIC = ITEMS.registerItem("reset_relic", ResetRelic::new,

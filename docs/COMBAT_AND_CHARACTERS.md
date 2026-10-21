@@ -10,9 +10,11 @@ This expansion descends from `0414feb` (the 0.2 overhaul). `Patterns.java` and t
 
 Four races retain their previous effects: Human's extra creation point, Elf's +1 DEX/+4% movement/+1 PP, Gnome's +1 INT and spell-cost efficiency, and Undead's +1 CON/one fatal-hit survival per fight/25% less restorative healing.
 
-Point buy still uses base 8–14, 12 points (13 Human), and the existing class/race bonuses. Starting identities are Warrior, Rogue, Wizard, Druid, Paladin and Warlock. New Warlock has 27 base HP, 18 base PP, +2 CHA, Psychic Blade and a third-BASH PP passive. Wizard retains 25 base HP but now has 40 base PP, Spark costs 2, and max PP grows by 4 per level. Warlock grows by 2 PP/level; others by 1. Capacity growth never refills current resources.
+Point buy still uses base 8–14, 12 points (13 Human), and the existing class/race bonuses. Starting identities are Warrior, Rogue, Wizard, Druid, Paladin and Warlock. Warlock has 27 base HP, 18 base PP, +2 CHA, Eldritch Blast (2 PP) and a third-BASH PP passive. Psychic Blade requires the optional Bladeslinger active node. Wizard retains 25 base HP but now has 40 base PP, Spark costs 2, and max PP grows by 4 per level. Warlock grows by 2 PP/level; others by 1. Capacity growth never refills current resources.
 
 Warlock BASH scales from the higher of STR/CHA and can combo with Psychic Blade. Pact PP regeneration is limited to 12 per recovery day, persists across fights, and cannot be farmed indefinitely through retreat. Still Mind restores 4 PP once per recovery day, with its use preserved through logout, retreat and clock rollback. Life Drain and finishing refunds always spend at least 1 net PP after efficiency. Threadlight is a late Arcane free cantrip, separate from BASH and much weaker than paid spells.
+
+Eldritch Blast's base damage is `11 + 2 * floor((CHA - 10) / 2)`, plus applicable legacy Warlock ranks and spell bonuses. BASH gets one damage per modifier; CHA also improves spell saves, Drain healing and the unlocked Psychic Blade combo. CHA does not add maximum PP: the existing limited INT/WIS capacity bonus remains. The sheet shows stat modifiers/BASH scaling; the combat ability list shows each casting stat, modifier and resulting damage.
 
 The 0.2 HP formula, modest DEX speed adjustments, normalized diagonals, guard mitigation, CHA rally and finite PP remain. All legal creation allocations retain 25–40 HP. Martial/support PP remains 8–18; Warlock can reach 22 and Wizard 44 at creation.
 
@@ -35,9 +37,11 @@ There are 88 nodes across 14 specializations:
 | Wizard | Arcane, Fire, Ice |
 | Druid | Nature, Restoration |
 | Paladin | Holy Defender, Retribution |
-| Warlock | Psychic Blade, Destruction, Affliction |
+| Warlock | Bladeslinger, Destruction, Affliction |
 
 Each main branch has five attribute/passive nodes before an active. Nodes require a purchased connection; lateral bridges at the middle of branches provide hybrid routes. Major actives also require five purchased passives globally. Additional deep actives cost two points. Every family is accessible from the common root; initial viewport focus follows the starting class. Previously purchased 0.2 path ranks/abilities continue to work alongside the new graph.
+
+In 0.3.1, each branch initially reads horizontally from left to right. Previous/next arrows browse all 14 branches; ALL, pan and zoom retain access to the full graph. The inspector and purchase button use the same requirement check as the server. Bladeslinger's stored `psychic_blade_*` IDs are unchanged, preserving all earlier purchases. An old Warlock receives Eldritch Blast as its starter; Psychic Blade remains available if its node was purchased.
 
 Effects include attributes, BASH/precision/spell damage, HP/PP capacity, efficiency, finite shields, movement, healing, status resistance, pact combos, curse leech and damage against afflicted enemies. Burn/curse deal timed damage; chill slows projectile advancement modestly; weakness reduces attack damage; rejuvenation has a finite three-round duration. Enemy saves use a deterministic d20 calculation and the relevant casting attribute. Later encounters can test WIS/Resolve against Dread. Manual dodging determines whether ordinary projectiles hit; there is no random passive dodge roll.
 

@@ -76,7 +76,7 @@ public final class CharacterProfile {
             - ((ability.path == CharacterClass.WIZARD || ability.path == CharacterClass.WARLOCK) ? SkillGraph.bonus(this, "efficiency") : 0)); }
     public List<Ability> abilities() {
         return Arrays.stream(Ability.values()).filter(a -> SkillGraph.unlocks(this, a)
-                || (a.ordinal() <= Ability.PSYCHIC_BLADE.ordinal() && (a.path == startingClass || rank(a.path) >= 2))).toList();
+                || (a.startsUnlocked() && (a.path == startingClass || rank(a.path) >= 2))).toList();
     }
     public boolean spendAttribute(Attribute a) {
         if (!created || attributePoints <= 0 || attributes[a.ordinal()] >= 18) return false;

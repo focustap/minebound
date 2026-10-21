@@ -22,6 +22,7 @@ public final class CharacterService {
         public Battle battle;
         public boolean open, resetArmed, dirty, settled;
         public long resetExpires, inputTick = -1, actionTick = -1;
+        public int actionsThisTick;
         public float inputX, inputY;
         public boolean focus;
         public String notice = "";
@@ -70,8 +71,13 @@ public final class CharacterService {
             if (!s.open || s.battle == null || s.inputTick == now || !Float.isFinite(c.x()) || !Float.isFinite(c.y())) return;
             s.inputX = Math.clamp(c.x(),-1,1); s.inputY = Math.clamp(c.y(),-1,1); s.focus = c.focus(); s.inputTick = now; return;
         }
-        if (!s.open || s.actionTick == now) return;
-        s.actionTick = now;
+        if (!s.open) return;
+        if (s.actionTick != now) { s.actionTick=now; s.actionsThisTick=0; }
+        // Rapid, valid purchases may share a server tick. Combat state still permits one turn.
+        // Always accept CLOSE so a menu cannot leave a player trapped in an active session.
+        if (!c.op().equals("CLOSE") && s.actionsThisTick++ >= 8) {
+            s.notice="Too many actions at once. Try again."; sync(player,s,"UPDATE"); return;
+        }
         try {
             switch (c.op()) {
                 case "CLOSE" -> { if (s.battle != null) s.battle.retreat(); s.battle = null; s.open = false; s.resetArmed = false; }

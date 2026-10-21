@@ -2,9 +2,12 @@ package com.focustap.minebound.rpg;
 
 public final class CombatRules {
     private CombatRules() {}
+    public static Attribute bashScaling(CharacterProfile p) {
+        return (p.startingClass == CharacterClass.WARLOCK || SkillGraph.bonus(p,"pact") > 0)
+                && p.modifier(Attribute.CHA) >= p.modifier(Attribute.STR) ? Attribute.CHA : Attribute.STR;
+    }
     public static int bash(CharacterProfile p, int attackNumber) {
-        int scaling = p.startingClass == CharacterClass.WARLOCK || SkillGraph.bonus(p,"pact") > 0
-                ? Math.max(p.modifier(Attribute.STR), p.modifier(Attribute.CHA)) : p.modifier(Attribute.STR);
+        int scaling = p.modifier(bashScaling(p));
         int damage = 7 + scaling + p.rank(CharacterClass.WARRIOR) + SkillGraph.bonus(p,"bash");
         if (p.startingClass == CharacterClass.WARRIOR) damage += 2;
         if (p.startingClass == CharacterClass.ROGUE && attackNumber % 3 == 0)

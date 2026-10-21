@@ -1,7 +1,6 @@
 package com.focustap.minebound;
 
 import com.focustap.minebound.rpg.*;
-import java.io.IOException;
 import com.focustap.minebound.net.Protocol;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -17,6 +16,7 @@ final class CharacterCreationScreen extends RetroScreen {
     CharacterCreationScreen(CharacterProfile profile) {
         super("Create your Minebound character"); this.profile = profile;
     }
+    @Override String pageLabel() { return "NEW CHARACTER"; }
     void serverNotice(String value) { error = value; pending = false; rebuild(); }
     @Override protected void init() { rebuild(); }
     private void rebuild() {
@@ -86,7 +86,7 @@ final class CharacterCreationScreen extends RetroScreen {
             text(g, "BASH: " + CombatRules.bash(profile, 1), 171, 107, CREAM);
             text(g, "SPEED: " + String.format(java.util.Locale.ROOT, "%.2f", profile.speed()), 171, 124, CREAM);
             wrap(g, "1 point per increase. Base 8-14; race and class bonuses included at left.", 171, 146, 122, LAVENDER);
-            text(g, "STR damage / DEX mobility / CON HP", 12, 183, LAVENDER);
+            text(g,"Ability scaling: "+profile.abilities().getFirst().scaling+" / +2 per mod",12,183,LAVENDER);
         } else {
             text(g, profile.race.label + " / " + profile.startingClass.label + " / Level 1", 12, 75, GOLD);
             text(g, "HP " + profile.maxHp() + "    PP " + profile.maxPp() + "    Skills: " + profile.level(), 12, 92, CREAM);

@@ -2,17 +2,18 @@
 
 A menu-driven RPG for **Minecraft 1.21.1 / NeoForge 21.1.262 / Java 21**. The Minebound Altar opens the RPG; it never generates dungeons or imports vanilla equipment into combat.
 
-Version **0.3.0** builds on the complete 0.2 overhaul. The original World 1 enemies, stage unlocks, manual dodge engine and pattern generator are retained.
+Version **0.3.1** builds on the complete 0.2 overhaul and 0.3 expansion. The original World 1 enemies, stage unlocks, manual dodge engine and pattern generator are retained.
 
 ## Implemented
 
 - Server-owned character creation and profiles: four races, six starting classes (including Warlock), attributes, Adventurer levels/XP, current HP/PP, goods, skills, stage completion and lore.
 - HP/PP carry across battles, altar entry, death and logout. Full recovery requires 24,000 elapsed Overworld simulation ticks; sleeping and `/time` cannot mint recoveries.
 - Survival XP for natural ores, personal hostile kills, mature crops (including compatible right-click harvest/replant transitions), and fishing. Persistent category budgets, deduplication and source restrictions limit abuse.
-- **88 connected skill nodes / 14 specializations**, panning, scroll zoom, distinct node shapes, prerequisites, hover details and confirmed purchases. Starting class never locks a family.
-- Wizard Arcane/Fire/Ice and Warlock Psychic Blade/Destruction/Affliction, plus Warrior/Rogue/Druid/Paladin paths. Status effects, saves, finite barriers, sustain limits and cross-family bonuses affect combat.
+- **88 connected skill nodes / 14 specializations**, readable branch views with previous/next controls, whole-web overview, panning/zoom, visible lock reasons, hover details and confirmed purchases. Starting class never locks a family.
+- Wizard Arcane/Fire/Ice and Warlock Bladeslinger/Destruction/Affliction, plus Warrior/Rogue/Druid/Paladin paths. Warlock starts with CHA-based **Eldritch Blast**; Psychic Blade is an optional Bladeslinger unlock. Status effects, saves, finite barriers, sustain limits and cross-family bonuses affect combat.
 - BASH / ABILITY / GOODS / DEFEND / RETREAT. Wizard starts with 40 base PP and Spark costs 2 before efficiency; Warlock has CHA-based melee combos and bounded PP recovery.
-- Original forest-map, skill-web and folio PNG backgrounds; custom pixel controls; animated supplied enemy sprites with transparent gutters and nearest sampling.
+- Original forest map, clean obsidian panels and pixel controls, explicit ability scaling and stat modifiers. Combat shows the animated supplied enemy sprite on a plain stage; book art no longer sits behind text/navigation.
+- Custom two-block altar: carved deepslate pedestal, gold arch and suspended amethyst crystal. Both halves open the RPG. Older single-block altars still work; re-place one to assemble the full model.
 - Intro story, World 1 stage dialogue, boss payoff, collectible lore, and a server-confirmed Creative Reset Relic.
 
 Shared four-heart parties, invitations/readiness and co-op encounter synchronization are **not implemented**. Players currently have individually authoritative battles, including on servers. No fake party UI is provided.
@@ -24,9 +25,9 @@ Shared four-heart parties, invitations/readiness and co-op encounter synchroniza
 .\gradlew.bat clean build
 ```
 
-On Linux/macOS use `./gradlew`. The normal build runs 30 JUnit tests and creates `build/libs/minebound-0.3.0.jar`. Install the same mod on server and clients.
+On Linux/macOS use `./gradlew`. The normal build runs 31 JUnit tests and creates `build/libs/minebound-0.3.1.jar`. Install the same mod on server and clients (network protocol 4).
 
-Place/craft an Altar or find it in Creative Functional Blocks. Create a character, select a map landmark, then press ENTER. WASD/arrows move the heart; Shift enables precision movement. Drag/scroll the skill canvas, select a node, and confirm its purchase.
+Place/craft an Altar with two blocks of vertical clearance or find it in Creative Functional Blocks. Create a character, select a map landmark, then press ENTER. WASD/arrows move the heart; Shift enables precision movement. Use the skill web's arrows to browse branches left to right, ALL for the overview, drag/scroll to pan/zoom, then select a node and confirm its purchase.
 
 ## Saves and migration
 
@@ -44,4 +45,4 @@ These are screenshots from the automated Minecraft client scenario, not mockups.
 ![Connected skill web](docs/screenshots/skill-web.png)
 ![Character sheet](docs/screenshots/character-sheet.png)
 
-More: [creation](docs/screenshots/creation.png), [battle](docs/screenshots/battle.png), [reset confirmation](docs/screenshots/reset.png).
+More: [creation](docs/screenshots/creation.png), [battle](docs/screenshots/battle.png), [ability scaling](docs/screenshots/abilities.png), [two-block altar](docs/screenshots/altar.png), [reset confirmation](docs/screenshots/reset.png).
