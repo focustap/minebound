@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64" shape-rendering="crispEdges">
+<rect width="64" height="64" fill="#171426"/><rect x="8" y="49" width="48" height="7" fill="#3E3A58"/><rect x="11" y="43" width="42" height="6" fill="#6B5C83"/><rect x="15" y="38" width="34" height="5" fill="#9885B5"/><rect x="18" y="33" width="28" height="5" fill="#CDBDE9"/><rect x="20" y="28" width="24" height="5" fill="#4B3F70"/>
+<rect x="26" y="18" width="12" height="13" fill="#9C84D0"/><rect x="29" y="10" width="6" height="8" fill="#F3E9D2"/><rect x="30" y="5" width="4" height="5" fill="#E8B86C"/><rect x="22" y="22" width="4" height="8" fill="#E8B86C"/><rect x="38" y="22" width="4" height="8" fill="#E8B86C"/><rect x="30" y="22" width="4" height="7" fill="#FEF9F1"/>
+<rect x="12" y="35" width="5" height="8" fill="#6EA484"/><rect x="47" y="35" width="5" height="8" fill="#6EA484"/><rect x="7" y="53" width="50" height="3" fill="#171426"/><rect x="20" y="50" width="24" height="3" fill="#E8B86C"/>
+<text x="32" y="63" font-family="monospace" font-size="5" text-anchor="middle" fill="#F3E9D2">MINEBOUND</text></svg>
