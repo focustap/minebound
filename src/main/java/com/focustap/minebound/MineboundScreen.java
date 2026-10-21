@@ -333,10 +333,59 @@ public final class MineboundScreen extends Screen {
         label(gfx, "TURN " + turn + "   " + ENEMIES[stage], x + 12, y + 31, CREAM);
         label(gfx, "Enemy HP: " + enemyHp, x + 12, y + 45, RED);
         gfx.fill(x + 10, y + 59, x + 290, y + 107, PLUM);
-        gfx.drawCenteredString(font, "A strange opponent approaches!", x + 150, y + 74, CREAM);
+        drawEnemyPortrait(gfx, x + 150, y + 83);
         label(gfx, "YOU", x + 13, y + 112, LAVENDER);
         label(gfx, "HP " + hp + "    PP " + pp, x + 58, y + 112, CREAM);
         label(gfx, status, x + 12, y + 126, GOLD);
+    }
+
+    /**
+     * Tiny original pixel portraits built with crisp rectangles, avoiding external
+     * IP assets. These are temporary designs until full PNG sprites are produced.
+     */
+    private void drawEnemyPortrait(GuiGraphics gfx, int centerX, int centerY) {
+        int main = switch (stage) {
+            case 0 -> FERN;
+            case 1 -> 0xFF668B59;
+            case 2 -> 0xFF6EA484;
+            case 3 -> 0xFF8E77B6;
+            default -> 0xFF927455;
+        };
+        int eye = switch (stage) {
+            case 0 -> GOLD;
+            case 1 -> RED;
+            case 2 -> RED;
+            case 3 -> GOLD;
+            default -> 0xFFE9CC82;
+        };
+        // Shadow, body, crown/hood, and eyes.
+        gfx.fill(centerX - 21, centerY + 14, centerX + 21, centerY + 17, INK);
+        gfx.fill(centerX - 16, centerY - 10, centerX + 16, centerY + 11, main);
+        gfx.fill(centerX - 13, centerY - 13, centerX + 13, centerY - 8, main);
+        gfx.fill(centerX - 10, centerY + 10, centerX + 10, centerY + 15, main);
+        gfx.fill(centerX - 11, centerY - 4, centerX - 4, centerY + 1, INK);
+        gfx.fill(centerX + 4, centerY - 4, centerX + 11, centerY + 1, INK);
+        gfx.fill(centerX - 9, centerY - 3, centerX - 5, centerY, eye);
+        gfx.fill(centerX + 5, centerY - 3, centerX + 9, centerY, eye);
+        gfx.fill(centerX - 4, centerY + 5, centerX + 4, centerY + 7, INK);
+        if (stage == 2) { // The Thorn Knight's distinct gold antlers.
+            gfx.fill(centerX - 19, centerY - 17, centerX - 13, centerY - 9, GOLD);
+            gfx.fill(centerX + 13, centerY - 17, centerX + 19, centerY - 9, GOLD);
+            gfx.fill(centerX - 8, centerY - 20, centerX + 8, centerY - 15, GOLD);
+        } else if (stage == 4) { // Crownroot's sprawling branch crown.
+            gfx.fill(centerX - 24, centerY - 21, centerX + 24, centerY - 15, FERN);
+            gfx.fill(centerX - 19, centerY - 26, centerX - 9, centerY - 12, FERN);
+            gfx.fill(centerX + 9, centerY - 26, centerX + 19, centerY - 12, FERN);
+        } else if (stage == 3) {
+            gfx.fill(centerX - 8, centerY - 18, centerX + 8, centerY - 11, LAVENDER);
+            gfx.fill(centerX - 3, centerY - 22, centerX + 3, centerY - 18, GOLD);
+        } else if (stage == 1) {
+            gfx.fill(centerX - 19, centerY + 4, centerX - 14, centerY + 16, RED);
+            gfx.fill(centerX + 14, centerY + 4, centerX + 19, centerY + 16, RED);
+        } else {
+            gfx.fill(centerX - 8, centerY - 17, centerX - 2, centerY - 11, GOLD);
+            gfx.fill(centerX + 2, centerY - 17, centerX + 8, centerY - 11, GOLD);
+        }
     }
 
     private void renderDodge(GuiGraphics gfx, int x, int y) {
