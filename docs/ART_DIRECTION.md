@@ -2,6 +2,8 @@
 
 **Intent:** Warm, slightly eerie whimsical 16-bit RPG pixel art, readable at Minecraft GUI scale. The interface and original SVG concepts follow this direction. Version 0.2 uses the repository owner's supplied Deltarune sheets for World 1 enemy animation; see [provenance and mapping](../art/source/world1/README.md).
 
+Version 0.3 adds original forest-map, arcane-web and folio PNG backgrounds, custom pixel-framed controls, code-drawn skill/map icons and an original reset seal. See [prompts and asset paths](../art/UI_ART.md) and [in-game screenshots](screenshots/world-map.png). Supplied enemy textures use isolated frame PNGs, two-pixel transparent gutters and explicit nearest/clamp metadata.
+
 ## Palette (hex)
 - Ink: #171426
 - Deep plum: #2B2444

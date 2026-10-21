@@ -1,34 +1,47 @@
 # Minebound
 
-A menu-based RPG for **Minecraft 1.21.1 / NeoForge 21.1.262**, accessed through the Minebound Altar. No physical dungeons, vanilla equipment imports, or Minecraft combat changes.
+A menu-driven RPG for **Minecraft 1.21.1 / NeoForge 21.1.262 / Java 21**. The Minebound Altar opens the RPG; it never generates dungeons or imports vanilla equipment into combat.
 
-Version 0.2 implements persistent **local single-player** characters, strategic commands, and manual bullet dodging. Shared multiplayer arenas and server authority remain future work.
+Version **0.3.0** builds on the complete 0.2 overhaul. The original World 1 enemies, stage unlocks, manual dodge engine and pattern generator are retained.
 
-## Play and build
+## Implemented
 
-Java 21 is required. The checked-in Gradle 9.2.1 wrapper downloads its own Gradle distribution.
+- Server-owned character creation and profiles: four races, six starting classes (including Warlock), attributes, Adventurer levels/XP, current HP/PP, goods, skills, stage completion and lore.
+- HP/PP carry across battles, altar entry, death and logout. Full recovery requires 24,000 elapsed Overworld simulation ticks; sleeping and `/time` cannot mint recoveries.
+- Survival XP for natural ores, personal hostile kills, mature crops (including compatible right-click harvest/replant transitions), and fishing. Persistent category budgets, deduplication and source restrictions limit abuse.
+- **88 connected skill nodes / 14 specializations**, panning, scroll zoom, distinct node shapes, prerequisites, hover details and confirmed purchases. Starting class never locks a family.
+- Wizard Arcane/Fire/Ice and Warlock Psychic Blade/Destruction/Affliction, plus Warrior/Rogue/Druid/Paladin paths. Status effects, saves, finite barriers, sustain limits and cross-family bonuses affect combat.
+- BASH / ABILITY / GOODS / DEFEND / RETREAT. Wizard starts with 40 base PP and Spark costs 2 before efficiency; Warlock has CHA-based melee combos and bounded PP recovery.
+- Original forest-map, skill-web and folio PNG backgrounds; custom pixel controls; animated supplied enemy sprites with transparent gutters and nearest sampling.
+- Intro story, World 1 stage dialogue, boss payoff, collectible lore, and a server-confirmed Creative Reset Relic.
+
+Shared four-heart parties, invitations/readiness and co-op encounter synchronization are **not implemented**. Players currently have individually authoritative battles, including on servers. No fake party UI is provided.
+
+## Run and build
 
 ```powershell
 .\gradlew.bat runClient
-.\gradlew.bat build
+.\gradlew.bat clean build
 ```
 
-On Linux/macOS use `./gradlew`. The mod jar is written to `build/libs/minebound-0.2.0.jar`; tests are included in `build`.
+On Linux/macOS use `./gradlew`. The normal build runs 29 JUnit tests and creates `build/libs/minebound-0.3.0.jar`. Install the same mod on server and clients.
 
-Find the Altar in Functional Blocks, or craft it with cobblestone, redstone and an amethyst shard. A new character must choose a race, starting class, point-buy attributes, and confirm their sheet before entering stages. Existing characters open the world map.
+Place/craft an Altar or find it in Creative Functional Blocks. Create a character, select a map landmark, then press ENTER. WASD/arrows move the heart; Shift enables precision movement. Drag/scroll the skill canvas, select a node, and confirm its purchase.
 
-- Four races: Human, Elf, Gnome, Undead; all racial effects work in combat.
-- Five starting classes: Warrior, Rogue, Wizard, Druid, Paladin. Every class can invest in every path.
-- Six attributes, live build previews, character sheet, ability summaries, and a common-root skill web.
-- BASH, ability selection, DEFEND and RETREAT. WASD/arrows move the heart; Shift enables precision movement.
-- Five distinct World 1 encounters, including three-phase Thorn Knight and Crownroot fights.
-- First-clear XP, levels, attribute and skill points; repeat clears give no farmable XP.
-- Your five supplied sprite sheets are stored intact in `art/source/world1`; the build generates transparent animated combat frames.
+## Saves and migration
 
-## Saves
+Authoritative files live in `<world>/data/minebound/players/<UUID>.json`, with atomic replacement and `.bak` retention. They are independent of Minecraft player inventory and XP. Server activity XP configuration is in `<world>/serverconfig/minebound-server.toml`.
 
-Profiles live under `<Minecraft game directory>/config/minebound/profiles/<world-or-server hash>/<player UUID>.json`. They are isolated per local world or server address and UUID. Confirmation, investments, and victory save immediately; writes retain a previous `.bak`. Reopening an altar or restarting the game restores the character. Each encounter starts rested; unfinished battles are not resumable and closing a battle counts as retreat.
+On the integrated single-player host, an existing 0.2 local profile is imported from its previous per-world/UUID location if no server profile exists. Original files and legacy path ranks/abilities remain intact. Dedicated servers never accept a client-uploaded profile. Exported version-1 progress and version-2 profiles have explicit migration paths; corrupt/future saves are not silently reset.
 
-The old prototype only kept characters in memory and cannot recover that lost state. A version-1 exported progress file can be migrated with its stage unlocks preserved, derived XP/earned points, a `.v1.bak`, and mandatory character creation. Corrupt or future-version files produce a visible error instead of being reset.
+See [rules and balance](docs/COMBAT_AND_CHARACTERS.md), [testing XP, recovery and reset](docs/TESTING.md), [server ownership and future parties](docs/NETWORKING.md), and [art generation prompts/provenance](art/UI_ART.md).
 
-See [combat and progression rules](docs/COMBAT_AND_CHARACTERS.md), [verification and in-game checklist](docs/TESTING.md), [sprite provenance and mapping](art/source/world1/README.md), and [future networking](docs/NETWORKING.md).
+## In-game previews
+
+These are screenshots from the automated Minecraft client scenario, not mockups.
+
+![World 1 map](docs/screenshots/world-map.png)
+![Connected skill web](docs/screenshots/skill-web.png)
+![Character sheet](docs/screenshots/character-sheet.png)
+
+More: [creation](docs/screenshots/creation.png), [battle](docs/screenshots/battle.png), [reset confirmation](docs/screenshots/reset.png).

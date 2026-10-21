@@ -12,6 +12,6 @@ These are the five sheets supplied by the repository owner in commit `53652fc` (
 
 Encounter names and mechanics retain World 1's existing identities. Art is mapped independently in `EnemySprites.java`.
 
-`gradle/enemy-sprites.gradle` selects frame rectangles and removes each frame's solid backdrop. It generates PNGs into `build/generated/enemySprites/assets/minebound/textures/enemy/world1`. Only generated combat frames are included as mod textures; sheets, credits panels and sheet backgrounds are not packaged as gameplay images. Changing crop coordinates or originals automatically invalidates the generation task.
+`gradle/enemy-sprites.gradle` selects frame rectangles and removes each frame's solid backdrop and any remaining sheet-background pixels. Version 0.3 adds two-pixel transparent gutters and explicit nearest/clamp texture metadata. It generates PNGs into `build/generated/enemySprites/assets/minebound/textures/enemy/world1`. Only generated combat frames are included as mod textures; sheets, credits panels and sheet backgrounds are not packaged as gameplay images. Changing crop coordinates or originals automatically invalidates the generation task.
 
 Credits visible in the supplied sheets include **TOBY FOX** (Ponman), **Modern / Ralsei Gang** (Jevil), and **EJ, asmy** (Ponman ripping credit). Preserve these original files for their full embedded attribution. This folder records supplied provenance rather than granting an asset license.
