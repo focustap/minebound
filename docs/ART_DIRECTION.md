@@ -1,6 +1,6 @@
 # Minebound Art Bible — early concept
 
-**Intent:** Warm, slightly eerie whimsical 16-bit RPG pixel art, readable at Minecraft GUI scale. Spirit of SNES-era RPGs and expressive retro battles **without imitating existing game assets**.
+**Intent:** Warm, slightly eerie whimsical 16-bit RPG pixel art, readable at Minecraft GUI scale. The interface and original SVG concepts follow this direction. Version 0.2 uses the repository owner's supplied Deltarune sheets for World 1 enemy animation; see [provenance and mapping](../art/source/world1/README.md).
 
 ## Palette (hex)
 - Ink: #171426
@@ -15,7 +15,7 @@
 
 ## Pixel rules
 - Work at 16x16, 32x32, 64x64 integer resolutions; upscale nearest-neighbor, no blurry filtering.
-- Avoid copyrighted EarthBound/Undertale sprites, exact HUDs, text, sound effects or music.
+- New commissioned art should follow the original Minebound concepts rather than copy another game's HUD, text, sound effects or music. The supplied sheets are documented separately.
 - Use angular amethyst-gold altar insignia, asymmetrical foliage, and charming-but-slightly-sinister bosses.
 - World map should look like a handmade paper gameboard, with paths/encounter tokens and stage flags.
 - Party HUD: compact framed name, HP, PP, optional status icons, each heart color identifies its controlling player.

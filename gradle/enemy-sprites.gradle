@@ -1,0 +1,39 @@
+// Keep supplied sheets intact; reproducibly compile only selected frames into the jar.
+def spriteSpecs = [
+    wobbly_thing: [sheet: 'Wobbly Thing', frames: [[1,18,39,33],[41,18,39,33],[81,18,39,33],[121,18,39,33]]],
+    rabbick: [sheet: 'Rabbick', frames: [[1,77,37,38],[40,77,37,38],[79,77,37,38]]],
+    rudinn: [sheet: 'Rudinn _ Rudinn Ranger', frames: [[0,100,35,40],[36,100,35,40],[72,100,35,40],[108,100,35,40]]],
+    ponman: [sheet: 'Ponman', frames: [[5,144,29,43],[36,144,29,43],[67,144,29,43],[98,144,29,43]]],
+    jevil: [sheet: 'Jevil', frames: [[16,52,42,41],[60,52,42,41],[104,52,42,41]]]
+]
+def spriteOutput = layout.buildDirectory.dir('generated/enemySprites')
+tasks.register('generateEnemySprites') {
+    inputs.dir('art/source/world1')
+    inputs.file('gradle/enemy-sprites.gradle')
+    outputs.dir(spriteOutput)
+    doLast {
+        def target = spriteOutput.get().dir('assets/minebound/textures/enemy/world1').asFile
+        target.mkdirs()
+        spriteSpecs.each { id, spec ->
+            def source = file("art/source/world1/PC _ Computer - Deltarune - Enemies & Bosses (Chapter 1) - ${spec.sheet}.png")
+            def sheet = javax.imageio.ImageIO.read(source)
+            spec.frames.eachWithIndex { rect, index ->
+                def result = new java.awt.image.BufferedImage(rect[2], rect[3], java.awt.image.BufferedImage.TYPE_INT_ARGB)
+                // Every selected frame has a solid backdrop; its most common RGB is the key.
+                def counts = [:].withDefault { 0 }
+                for (int y = 0; y < rect[3]; y++) for (int x = 0; x < rect[2]; x++) {
+                    int rgb = sheet.getRGB(rect[0] + x, rect[1] + y) & 0xffffff
+                    counts[rgb]++
+                }
+                int key = counts.max { it.value }.key
+                for (int y = 0; y < rect[3]; y++) for (int x = 0; x < rect[2]; x++) {
+                    int argb = sheet.getRGB(rect[0] + x, rect[1] + y)
+                    result.setRGB(x, y, (argb & 0xffffff) == key ? 0 : argb)
+                }
+                javax.imageio.ImageIO.write(result, 'png', new File(target, "${id}_${index}.png"))
+            }
+        }
+    }
+}
+sourceSets.main.resources.srcDir(spriteOutput)
+tasks.named('processResources') { dependsOn('generateEnemySprites') }
