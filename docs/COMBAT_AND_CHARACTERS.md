@@ -1,53 +1,65 @@
-# Character and combat implementation
+# Minebound 0.3 rules and balance
 
-## Ownership and modules
+## Preservation and ownership
 
-`rpg/CharacterProfile` owns a character's race/class, six base attributes, five path ranks, XP, unspent points and cleared-stage bitset. `Race`, `CharacterClass`, `Ability`, and `EnemyDefinition` are extensible definitions. `CombatRules` contains damage, healing and mitigation formulas. `Battle` runs a 20-tick simulation without Minecraft dependencies; `Patterns` generates constant-velocity `Projectile` objects with delayed activation. `ProfileStore` handles versioned JSON and atomic local writes. `CharacterCreationScreen`, `RetroScreen`, `MineboundScreen`, and `EnemySprites` handle presentation and input.
+This expansion descends from `0414feb` (the 0.2 overhaul). `Patterns.java` and the five World 1 enemy HP/damage/first-clear definitions are unchanged. The supplied source sheets remain intact. Battle commands now run on the server with validated movement inputs; profiles and resource changes are stored under the server world, not accepted from a client.
 
-The simulation is local single-player. It accepts commands and normalized movement rather than reading keys or widgets; these boundaries can later be owned by a server. No networking, party readiness, synchronized hearts, or trusted multiplayer persistence is claimed.
+`rpg` contains character definitions, the skill graph, recovery/XP rules, combat calculations, narrative records and the existing battle simulation. `server/CharacterService` owns sessions and persistence. `server/ActivityXp` verifies Minecraft events and transitions; `Protocol` carries bounded intents and server snapshots. Client screens render those snapshots and send choices. Client-only wiring is dist-filtered and common altar/server classes never reference Minecraft rendering.
 
-## Creation and resources
+## Characters
 
-Base attributes start at 8. Spend 12 points (13 for Human), one per increase, up to 14 before bonuses. Race adds +1 DEX/INT/CON for Elf/Gnome/Undead. Starting class adds +2 to its primary attribute; Paladin also adds +1 STR and WIS. Displayed stats include those bonuses. Attribute modifier is `floor((stat - 10) / 2)`.
+Four races retain their previous effects: Human's extra creation point, Elf's +1 DEX/+4% movement/+1 PP, Gnome's +1 INT and spell-cost efficiency, and Undead's +1 CON/one fatal-hit survival per fight/25% less restorative healing.
 
-| Class | Base HP | Base PP | Starting ability | Working starting passive |
-|---|---:|---:|---|---|
-| Warrior | 29 | 8 | Cleave (STR) | BASH +2 |
-| Rogue | 25 | 9 | Quick Cut (DEX) | Every third BASH gains 3 + positive DEX modifier damage |
-| Wizard | 25 | 14 | Spark (INT) | Offensive spells +2 |
-| Druid | 27 | 11 | Bramble, Mend (WIS) | Restorative spells heal +2 |
-| Paladin | 31 | 8 | Ward (WIS) | Guarding reduces incoming damage by another 1 |
+Point buy still uses base 8–14, 12 points (13 Human), and the existing class/race bonuses. Starting identities are Warrior, Rogue, Wizard, Druid, Paladin and Warlock. Warlock has 27 base HP, 18 base PP, +2 CHA, Eldritch Blast (2 PP) and a third-BASH PP passive. Psychic Blade requires the optional Bladeslinger active node. Wizard retains 25 base HP but now has 40 base PP, Spark costs 2, and max PP grows by 4 per level. Warlock grows by 2 PP/level; others by 1. Capacity growth never refills current resources.
 
-Max HP is base HP + CON - 8 + 2 per level beyond 1 + Paladin path rank. Max PP is base PP + combined positive INT/WIS modifiers (capped at 3) + Elf's 1 PP + Wizard path rank. Every legal creation allocation stays within **25–40 HP and 8–18 PP**, exhaustively tested. New encounters restore resources; PP never regenerates during a fight.
+Warlock BASH scales from the higher of STR/CHA and can combo with Psychic Blade. Pact PP regeneration is limited to 12 per recovery day, persists across fights, and cannot be farmed indefinitely through retreat. Still Mind restores 4 PP once per recovery day, with its use preserved through logout, retreat and clock rollback. Life Drain and finishing refunds always spend at least 1 net PP after efficiency. Threadlight is a late Arcane free cantrip, separate from BASH and much weaker than paid spells.
 
-Elf adds 4% movement; Gnome reduces every ability's cost by 1 (minimum 1). Undead survives a fatal hit at 1 HP once per battle and receives 25% less restorative healing. Human's additional point is spent during creation.
+Eldritch Blast's base damage is `11 + 2 * floor((CHA - 10) / 2)`, plus applicable legacy Warlock ranks and spell bonuses. BASH gets one damage per modifier; CHA also improves spell saves, Drain healing and the unlocked Psychic Blade combo. CHA does not add maximum PP: the existing limited INT/WIS capacity bonus remains. The sheet shows stat modifiers/BASH scaling; the combat ability list shows each casting stat, modifier and resulting damage.
 
-## Combat
+The 0.2 HP formula, modest DEX speed adjustments, normalized diagonals, guard mitigation, CHA rally and finite PP remain. All legal creation allocations retain 25–40 HP. Martial/support PP remains 8–18; Warlock can reach 22 and Wizard 44 at creation.
 
-BASH is 7 + STR modifier + Warrior path rank, with class passive adjustments. Offensive abilities deal 11 + 2 times their scaling modifier + their path rank, with Wizard's spell passive where applicable. Bramble also heals; Mend is a dedicated heal; Ward heals and guards; Quick Cut adds 8% heart speed during the next dodge phase. Ability costs are 3–4 PP before Gnome efficiency.
+## Persistent resources and goods
 
-CON reduces incoming damage by one per four CON above 10. Guard halves the result; Paladin's passive applies afterward. Minimum guarded damage is 2 before the finite rally shield. DEFEND's rally absorbs 1 + positive CHA modifier damage across that phase. Healing uses WIS and Druid rank. Spending a turn to defend never restores PP.
+Battle starts read current HP/PP. Victory, retreat, altar reopening, level-up and node purchase do not refill them. A finished battle is settled once, so old snapshots cannot overwrite subsequent healing. An unfinished battle is abandoned on close/logout, preserving resources already spent or lost.
 
-Heart speed starts at 2.05 logical units/tick, adjusts modestly with DEX, Elf and Rogue path, and is capped at 2.85. Diagonal input is normalized, and Shift multiplies speed by .55. Collision uses a three-unit heart hit radius and swept bullet segments. A hit grants 18 ticks of invulnerability. No random passive evasion or homing projectiles.
+Every character receives one starting herb. First clears award one herb (two from Crownroot), with an ether from Thorn Knight and Crownroot. Herbs restore 12 HP (9 Undead); ethers restore 6 PP. Goods can be used on the map, including reviving a downed RPG character. In combat they consume a command and trigger a dodge phase. These goods never read or modify vanilla inventory.
 
-## World 1
+Recovery uses Overworld `gameTime`, not `dayTime` or wall-clock time. At least 24,000 ticks must elapse after the last full recovery, regardless of dimension. Sleep and `/time set` alter daylight, not this eligibility. Recovery waits until the character leaves an active encounter and is announced in the interface. A clock rollback rebases the timer without granting recovery or refreshing restoration budgets. Repeated opens/reconnects cannot claim a second recovery.
 
-| Stage | Enemy | HP | Base hit damage | First-clear XP | Pattern identity |
-|---|---|---:|---:|---:|---|
-| 1-1 | Moss Sprite | 42 | 6 | 60 | Aimed three-shot spreads from cycling edges |
-| 1-2 | Briarling | 57 | 7 | 90 | Crossfire alternating with aimed spreads |
-| 1-3 | Thorn Knight | 108 | 8 | 120 | Rotating aimed, crossfire and gate formations |
-| 1-4 | Mire Oracle | 82 | 8 | 150 | Predictive spreads/waves alternating with marked ground |
-| 1-5 | Crownroot | 186 | 9 | 240 | All formations; phase 2 adds gates, phase 3 adds ground hazards |
+## Connected web
 
-Boss phase changes occur at two-thirds and one-third HP. Each phase increases damage by 1 and slightly increases shot speed/cadence. Pattern selection rotates with turn, segment, and boss phase. Every dodge phase lasts 204 ticks, with a 24-tick initial grace interval. Gates provide 48 ticks of warning and at least a 48-unit nominal opening; ground hazards mark the heart's position for 28 ticks before activation. Spreads lock aim at launch; occasional predictive shots lead recent velocity by 12 ticks. Hollow outlines are harmless warnings. Patterns stop spawning near the end of the phase.
+There are 88 nodes across 14 specializations:
 
-Automated checks demonstrate gap routes and a clean dodge against aimed spreads, and reject stationary camping at sampled arena positions. They do not constitute a proof that every dynamically targeted boss sequence is avoidable. Full fights require skilled in-game tuning.
+| Family | Branches |
+|---|---|
+| Warrior | Guardian, Berserker |
+| Rogue | Assassin, Trickster |
+| Wizard | Arcane, Fire, Ice |
+| Druid | Nature, Restoration |
+| Paladin | Holy Defender, Retribution |
+| Warlock | Bladeslinger, Destruction, Affliction |
 
-## Progression and multiclassing
+Each main branch has five attribute/passive nodes before an active. Nodes require a purchased connection; lateral bridges at the middle of branches provide hybrid routes. Major actives also require five purchased passives globally. Additional deep actives cost two points. Every family is accessible from the common root; initial viewport focus follows the starting class. Previously purchased 0.2 path ranks/abilities continue to work alongside the new graph.
 
-Confirmation grants one skill point. Level L requires total XP `30 * (L - 1) * L` (60 / 180 / 360 / 600 for levels 2–5). Every gained level gives two attribute points and one skill point. Base attributes can be improved to 18. All five first-clear rewards total 660 XP, reaching level 5. Replay grants no XP, points, or additional unlock rewards. No Minecraft-action XP hook is installed.
+In 0.3.1, each branch initially reads horizontally from left to right. Previous/next arrows browse all 14 branches; ALL, pan and zoom retain access to the full graph. The inspector and purchase button use the same requirement check as the server. Bladeslinger's stored `psychic_blade_*` IDs are unchanged, preserving all earlier purchases. An old Warlock receives Eldritch Blast as its starter; Psychic Blade remains available if its node was purchased.
 
-Every path is open from the common root. Each has three ranks, with a second rank requiring two investments anywhere in the web. Rank 2 teaches that path's ability (Druid also teaches Mend); the starting class already knows its own abilities. Rank 3 strengthens passives and ability scaling. The permanent starting passive remains tied to the original class.
+Effects include attributes, BASH/precision/spell damage, HP/PP capacity, efficiency, finite shields, movement, healing, status resistance, pact combos, curse leech and damage against afflicted enemies. Burn/curse deal timed damage; chill slows projectile advancement modestly; weakness reduces attack damage; rejuvenation has a finite three-round duration. Enemy saves use a deterministic d20 calculation and the relevant casting attribute. Later encounters can test WIS/Resolve against Dread. Manual dodging determines whether ordinary projectiles hit; there is no random passive dodge roll.
 
-Per rank: Warrior gives +1 BASH, Rogue +.05 movement, Wizard +1 PP, Druid +1 restorative healing, Paladin +1 HP. This is a small connected foundation, not a finished large skill tree. More worlds, nodes and earned XP sources can expand it later.
+The graph is functional but still an initial content/balance set. Multi-enemy explosions, curse spreading and a more extensive combinatorial spell system need future multi-enemy encounters; no decorative inactive nodes claim those mechanics.
+
+## Adventurer progression
+
+Level L requires total XP `30 * (L - 1) * L`; level-ups grant one skill point and two attribute points. First clears still award 60/90/120/150/240 XP, once each. Survival activity XP is a separate source and never consumes vanilla XP.
+
+| Activity | Default raw award | Default per-player 24,000-tick budget |
+|---|---|---|
+| Natural ore | 2 common, 3 iron/lapis/redstone, 5 gold, 12 diamond, 15 emerald, 20 ancient debris | 120 XP |
+| Personal hostile kill | 3 normal, 5 tougher, 12 boss-health targets | 100 XP |
+| Verified mature crop harvest | 2 | 60 XP |
+| Fishing | 3 fish / 5 other catches | 40 XP |
+
+Awards are scaled by `activityXpRate / (1 + (level - 1) * levelXpPenalty)`, with default penalty .025. Budgets, event cooldowns and duplicate records persist per player; ore placement/mining history is world-owned. Stones, generators, fake players, Creative, spectators, tagged spawner/dispenser mobs, and remote kills are excluded. Fishing requires a normal server-observed cast, minimum cast duration, recent movement and a catch cooldown. These restrictions limit farms but are not a claim that software can distinguish every human from a sophisticated bot.
+
+Mature crops are captured at highest-priority right-click interaction, including interactions a harvesting mod later cancels as handled. The following server tick verifies mature-to-younger/removed crop state. Repeated clicks without a transition award nothing, and break/right-click events share position cooldowns. Vanilla `CropBlock`, crop tags and conventional named crop age properties are supported. Mods with delayed/nonstandard crop storage require specific compatibility work.
+
+Purchasing an active node for an ability your starting class already knows grants mastery (+2 damage, restorative healing or finite shield potency where applicable). It is an upgrade, not an empty unlock.

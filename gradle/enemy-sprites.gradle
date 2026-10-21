@@ -18,7 +18,8 @@ tasks.register('generateEnemySprites') {
             def source = file("art/source/world1/PC _ Computer - Deltarune - Enemies & Bosses (Chapter 1) - ${spec.sheet}.png")
             def sheet = javax.imageio.ImageIO.read(source)
             spec.frames.eachWithIndex { rect, index ->
-                def result = new java.awt.image.BufferedImage(rect[2], rect[3], java.awt.image.BufferedImage.TYPE_INT_ARGB)
+                // A transparent two-pixel gutter prevents neighboring texture samples.
+                def result = new java.awt.image.BufferedImage(rect[2]+4, rect[3]+4, java.awt.image.BufferedImage.TYPE_INT_ARGB)
                 // Every selected frame has a solid backdrop; its most common RGB is the key.
                 def counts = [:].withDefault { 0 }
                 for (int y = 0; y < rect[3]; y++) for (int x = 0; x < rect[2]; x++) {
@@ -28,11 +29,23 @@ tasks.register('generateEnemySprites') {
                 int key = counts.max { it.value }.key
                 for (int y = 0; y < rect[3]; y++) for (int x = 0; x < rect[2]; x++) {
                     int argb = sheet.getRGB(rect[0] + x, rect[1] + y)
-                    result.setRGB(x, y, (argb & 0xffffff) == key ? 0 : argb)
+                    int backdrop = sheet.getRGB(1,1) & 0xffffff
+                    result.setRGB(x+2, y+2, (argb & 0xffffff) == key || (argb & 0xffffff) == backdrop ? 0 : argb)
                 }
                 javax.imageio.ImageIO.write(result, 'png', new File(target, "${id}_${index}.png"))
+                new File(target,"${id}_${index}.png.mcmeta").text = '{"texture":{"blur":false,"clamp":true}}'
             }
         }
+        // Original 16x16 seal with amethyst core and a return rune.
+        def icon = new java.awt.image.BufferedImage(16,16,java.awt.image.BufferedImage.TYPE_INT_ARGB)
+        for (int y=1;y<15;y++) for (int x=1;x<15;x++) {
+            int distance=Math.abs(x-7)+Math.abs(y-7)
+            if (distance<=7) icon.setRGB(x,y,(int)(distance>=6 ? 0xffe8b86cL : distance>=4 ? 0xff2b2444L : 0xffa57cceL))
+        }
+        [[5,5],[6,4],[7,4],[8,4],[9,5],[10,6],[10,7],[9,8],[8,9],[7,9],[6,9],[5,8],[4,8],[4,9],[4,10]].each { p -> icon.setRGB(p[0],p[1],(int)0xfff3e9d2L) }
+        def itemTarget=spriteOutput.get().dir('assets/minebound/textures/item').asFile
+        itemTarget.mkdirs()
+        javax.imageio.ImageIO.write(icon,'png',new File(itemTarget,'reset_relic.png'))
     }
 }
 sourceSets.main.resources.srcDir(spriteOutput)

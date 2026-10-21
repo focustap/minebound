@@ -30,7 +30,7 @@ class CharacterRulesTest {
         for (Race race : Race.values()) for (CharacterClass path : CharacterClass.values()) {
             CharacterProfile p = character(race, path);
             assertTrue(p.maxHp() >= 25 && p.maxHp() <= 40, race + "/" + path + " HP " + p.maxHp());
-            assertTrue(p.maxPp() >= 8 && p.maxPp() <= 18, race + "/" + path + " PP " + p.maxPp());
+            assertTrue(p.maxPp() >= 8 && p.maxPp() <= ppCeiling(path), race + "/" + path + " PP " + p.maxPp());
             assertTrue(p.abilities().stream().anyMatch(a -> a.path == path));
             Battle battle = new Battle(p, 0);
             Ability a = p.abilities().getFirst();
@@ -49,7 +49,7 @@ class CharacterRulesTest {
         if (index == 6) {
             if (remaining != 0) return;
             assertTrue(p.maxHp() >= 25 && p.maxHp() <= 40, p.startingClass + " HP " + p.maxHp());
-            assertTrue(p.maxPp() >= 8 && p.maxPp() <= 18, p.startingClass + " PP " + p.maxPp());
+            assertTrue(p.maxPp() >= 8 && p.maxPp() <= ppCeiling(p.startingClass), p.startingClass + " PP " + p.maxPp());
             return;
         }
         for (int spent = 0; spent <= Math.min(6, remaining); spent++) {
@@ -57,6 +57,7 @@ class CharacterRulesTest {
         }
         p.attributes[index] = 8;
     }
+    private int ppCeiling(CharacterClass path) { return path == CharacterClass.WIZARD ? 44 : path == CharacterClass.WARLOCK ? 22 : 18; }
     @Test void racesAffectActualRules() {
         CharacterProfile human = character(Race.HUMAN, CharacterClass.DRUID);
         CharacterProfile elf = character(Race.ELF, CharacterClass.DRUID);

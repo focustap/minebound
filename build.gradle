@@ -62,6 +62,22 @@ var generateModMetadata = tasks.register('generateModMetadata', ProcessResources
 sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
 
+// Explicit opt-in QA driver; these sources are absent from normal builds/jars.
+if (providers.gradleProperty('mineboundSmoke').isPresent()) {
+    sourceSets.main.java.srcDir 'src/smoke/java'
+    neoForge.runs.client.systemProperty 'minebound.smoke', 'true'
+    tasks.named('runClient') {
+        doFirst { layout.buildDirectory.file('smoke-result.txt').get().asFile.delete() }
+        doLast {
+            def report=layout.buildDirectory.file('smoke-result.txt').get().asFile
+            if (!report.exists() || report.text.trim() != 'PASS') throw new GradleException('Minebound in-game smoke scenario failed; inspect run/logs/latest.log')
+        }
+    }
+}
+if (providers.gradleProperty('mineboundServerSmoke').isPresent()) {
+    neoForge.runs.server.programArgument '--initSettings'
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }

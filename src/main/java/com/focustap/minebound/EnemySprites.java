@@ -16,6 +16,7 @@ final class EnemySprites {
             case "crownroot" -> new Sprite("jevil", 3, 42, 41);
             default -> throw new IllegalArgumentException("Unknown enemy art: " + enemy);
         };
+        s = new Sprite(s.sheet,s.frames,s.width+4,s.height+4);
         int frame = (ticks / 8) % s.frames;
         ResourceLocation texture = ResourceLocation.fromNamespaceAndPath("minebound", "textures/enemy/world1/" + s.sheet + "_" + frame + ".png");
         g.blit(texture, centerX - s.width / 2, centerY - s.height / 2, 0, 0, s.width, s.height, s.width, s.height);

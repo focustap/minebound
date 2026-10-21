@@ -1,9 +1,11 @@
-# Minebound game design
+# Minebound design direction
 
-The current implemented rules are documented in [COMBAT_AND_CHARACTERS.md](COMBAT_AND_CHARACTERS.md), with [verification](TESTING.md) and [art direction](ART_DIRECTION.md).
+Current gameplay rules: [COMBAT_AND_CHARACTERS.md](COMBAT_AND_CHARACTERS.md). Verification and manual instructions: [TESTING.md](TESTING.md).
 
-The altar opens a persistent character and a five-node World 1 map. Encounters take place entirely in menus; Minecraft equipment and combat remain separate. First-time players create a race/class/attribute build before entering stages. Classes provide a starting identity while all five skill paths remain accessible through a common root.
+The RPG is contained in the altar interface. World 1 still uses the five existing encounters and manual bullet patterns. Races, six starting classes, connected specialization choices, current resources and earned progression are server-owned. Ordinary survival activity supplies separate Adventurer XP, with caps and event validation. Nothing in a Minebound build increases normal Minecraft combat power.
 
-Single-player progression currently awards first-clear encounter XP only. Long-term Minecraft activity rewards need explicit anti-automation design before they are added. GOODS, more worlds and a much larger interconnected skill tree remain future content.
+The realm once grew beside the Overworld. Its inhabitants opened a crossing; the old altars sealed what came through. Crownroot became a living lock. Clearing the woods reveals that someone called the Unwritten is learning the names behind the seals. Later regions should expose additional pieces rather than explain the whole catastrophe immediately.
 
-The intended multiplayer design is described in [NETWORKING.md](NETWORKING.md). Current battles and saved characters are local; party invitations, readiness, authoritative damage and shared hearts are not implemented.
+Original forest-map, arcane-web and character-folio backgrounds support the retro interface. Existing supplied enemy sheets are preserved, isolated from the new original interface art, and compiled into padded animated frames. See [art provenance and prompts](../art/UI_ART.md).
+
+The current graph has 14 specializations, with five meaningful passives before each main active and cross-family bridges. Multi-enemy area effects, spreading debuffs, more worlds and deeper spell combinations are future content. Shared parties require the explicit server architecture in [NETWORKING.md](NETWORKING.md); no simulated/fake co-op is presented.

@@ -1,1 +1,68 @@
-{"variants":{"":{"model":"minebound:block/altar"}}}
+{
+  "variants": {
+    "assembled=false,facing=north,half=lower": {
+      "model": "minebound:block/altar",
+      "y": 0
+    },
+    "assembled=false,facing=east,half=lower": {
+      "model": "minebound:block/altar",
+      "y": 90
+    },
+    "assembled=false,facing=south,half=lower": {
+      "model": "minebound:block/altar",
+      "y": 180
+    },
+    "assembled=false,facing=west,half=lower": {
+      "model": "minebound:block/altar",
+      "y": 270
+    },
+    "assembled=false,facing=north,half=upper": {
+      "model": "minebound:block/altar_upper",
+      "y": 0
+    },
+    "assembled=false,facing=east,half=upper": {
+      "model": "minebound:block/altar_upper",
+      "y": 90
+    },
+    "assembled=false,facing=south,half=upper": {
+      "model": "minebound:block/altar_upper",
+      "y": 180
+    },
+    "assembled=false,facing=west,half=upper": {
+      "model": "minebound:block/altar_upper",
+      "y": 270
+    },
+    "assembled=true,facing=north,half=lower": {
+      "model": "minebound:block/altar",
+      "y": 0
+    },
+    "assembled=true,facing=east,half=lower": {
+      "model": "minebound:block/altar",
+      "y": 90
+    },
+    "assembled=true,facing=south,half=lower": {
+      "model": "minebound:block/altar",
+      "y": 180
+    },
+    "assembled=true,facing=west,half=lower": {
+      "model": "minebound:block/altar",
+      "y": 270
+    },
+    "assembled=true,facing=north,half=upper": {
+      "model": "minebound:block/altar_upper",
+      "y": 0
+    },
+    "assembled=true,facing=east,half=upper": {
+      "model": "minebound:block/altar_upper",
+      "y": 90
+    },
+    "assembled=true,facing=south,half=upper": {
+      "model": "minebound:block/altar_upper",
+      "y": 180
+    },
+    "assembled=true,facing=west,half=upper": {
+      "model": "minebound:block/altar_upper",
+      "y": 270
+    }
+  }
+}

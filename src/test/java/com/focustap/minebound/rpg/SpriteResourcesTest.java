@@ -20,7 +20,10 @@ class SpriteResourcesTest {
                 }
                 assertTrue(transparent > 100, resource + " has no transparent backdrop");
                 assertTrue(visible > 30, resource + " has no visible sprite");
-                assertTrue(image.getWidth() <= 42 && image.getHeight() <= 43);
+                assertTrue(image.getWidth() <= 46 && image.getHeight() <= 47);
+                for (int x=0;x<image.getWidth();x++) {
+                    assertEquals(0,image.getRGB(x,0) >>> 24); assertEquals(0,image.getRGB(x,image.getHeight()-1) >>> 24);
+                }
             }
         }
     }

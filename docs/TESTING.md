@@ -1,30 +1,72 @@
-# Verification
+# Testing Minebound 0.3.1
 
-Run `./gradlew build` (Windows: `.\gradlew.bat build`) on Java 21. JUnit tests use pure simulation and temporary profile directories, without launching Minecraft. The sprite generation task is reproducible and runs before resources are packaged.
+## Automated checks
 
-Automated coverage:
+```powershell
+.\gradlew.bat clean build
+```
 
-- Creation gate, point-buy min/max/budget, one-time grant, all 20 race/class combinations, and exhaustive legal point-buy HP/PP ranges.
-- Racial PP efficiency, Elf movement, Human budget, Undead fatal-hit survival and healing tradeoff.
-- Attribute scaling, class passive differences, finite PP, healing, defensive mitigation, and CHA rally shielding.
-- All five first clears, stage unlocks, repeat-reward rejection, levels, point spending, and learning another class's abilities.
-- Persistent round trip, independent world/player files, backups, legacy migration, and rejection of corrupt/future data.
-- Stationary hearts get hit and lose on every stage; cycling spawn coverage includes the whole arena; targeting locks at launch and prediction uses velocity.
-- Boss phase changes and at least five commands per boss for every level-1 starting class.
-- Swept collision, normalized diagonal speed, harmless telegraphs, open gate routes and a scripted clean spread dodge.
-- Corners and center cannot remain safe for an entire phase; all 18 generated sprite frames have transparency, visible pixels and packaged resources.
+The normal build runs **31 JUnit tests**: creation and all race/class combinations, exhaustive legal creation resource ranges, first-clear XP/leveling, legacy data, current-resource reloads, one-time/rollback-safe recovery, duplicate activity awards and budgets, graph connectivity/hybrids, Wizard multi-encounter resource balance, Warlock starter/CHA scaling/Bladeslinger unlock preservation, sustain limits, net spell costs, reset aggregate reload, targeting/camping, boss phases/durability, collision and sprite gutters.
 
-A development Minecraft client was launched successfully on NeoForge 21.1.262 / Minecraft 1.21.1, including resource reload and renderer initialization. This is a startup smoke check, not an interactive altar playthrough.
+An opt-in **real Minecraft client/integrated-server scenario** creates its own throwaway world and operates the actual screens and network handlers:
 
-## Required in-game acceptance pass
+```powershell
+.\gradlew.bat -PmineboundSmoke runClient
+```
 
-1. Create a fresh world, place/craft an altar, and verify stages cannot be entered before confirmation. Cancel, reopen, and try all race/class selections, back navigation and point changes; compare live HP/PP/damage with the final sheet.
-2. Confirm with a custom name. Verify one skill point, immediate map access, character attributes, bonuses and ability descriptions. Test tooltips, keyboard focus, minimum GUI resolution, window resize and GUI scale changes.
-3. Spend the initial skill point, exit Minecraft, relaunch the same world and confirm the build and name persist. Compare another world/player. Back up and restore a profile; verify invalid JSON displays an error without replacement.
-4. Play 1-1 through 1-5 at intended levels using each class. Observe that stationary hearts are punished, outlines provide sufficient warning, shift movement is useful, all edges matter, and each new stage teaches its mechanic. Check for paths through overlapping gates and ground hazards, especially at arena corners and in Crownroot phase 3.
-5. Confirm class abilities spend the advertised PP and use the correct stat; try insufficient PP, all racial effects, Mend, Bramble, Quick Cut, Ward and DEFEND. Undead should survive exactly one fatal hit per fight. Verify no goods or vanilla equipment affect RPG stats.
-6. Trigger both boss transitions and check that changes are readable. Defeat, retreat, Escape-close and re-enter; no unfinished fight may grant rewards. Confirm first-clear XP/unlocks save, level points work, and replay does not re-award them.
-7. Check animated frames for Wobbly Thing, Rabbick, Rudinn, Ponman and Jevil: no backgrounds or sheet labels should appear. Confirm transparency and crisp rendering on different GUI scales.
-8. Attempt clean dodges across complete fights, including level-1 Crownroot. The automated fixtures establish specific escape routes and durability, not a global no-hit solvability proof. Tune cadence, warning duration and overlap from actual play results.
+It verifies altar opening, story/creation and the single initial point, a graph purchase, server-resolved spell use, resource carryover after closing/reopening, eligible recovery, natural-ore event XP, personal hostile-kill XP, right-click harvest/replant deduplication, the normal fishing event path, disk reload, victory without refilling, out-of-combat goods after settlement, reset cancellation, full reset reload, and vanilla inventory isolation. The right-click and fishing fixtures post the corresponding server events rather than wait for random catches or install a third-party harvesting mod. A failing assertion makes the Gradle task fail. QA sources are excluded from normal builds.
 
-Future work: server-owned profiles and battle simulation, shared hearts/party readiness, a larger skill graph, additional worlds, reviewed Minecraft progression hooks, sound, goods and broader accessibility. No multiplayer acceptance is claimed by this change.
+Captured screenshots are written to `run/screenshots/minebound-*.png`; selected previews are checked into `docs/screenshots`. The full integrated scenario passed during this change.
+
+The 0.3.1 visual scenario additionally uses actual mouse press/release dispatch (rather than invoking button callbacks) at 854x480/GUI 2 and 1280x800/GUI 3. It creates a Warlock, verifies Eldritch Blast replaces implicit Psychic Blade, buys a Bladeslinger node, repeatedly navigates sheet/web/map/lore/goods without reopening, and starts/operates a second battle after victory. It captures the plain battle stage, visible scaling, bounded text and new layout. It places the tall altar through its item, rejects an obstructed ceiling, checks legacy single-block survival on neighbor updates, and breaks the upper half in Survival to verify one item and no orphan base.
+
+A dedicated `--initSettings` bootstrap also completed without a client-class error:
+
+```powershell
+.\gradlew.bat -PmineboundServerSmoke runServer
+```
+
+That last check initializes dedicated-server settings and exits; it does not validate remote gameplay or start a production world. GitHub Actions builds Java 21/NeoForge and runs JUnit, not the graphical scenario. Its commit-specific result is reported in the expansion PR.
+
+## Verify preservation and saves
+
+1. Back up a test world. Existing 0.2 host-local profiles should import automatically into `<world>/data/minebound/players/<UUID>.json`, retaining name, race, class, attributes, XP, old path bonuses/abilities and cleared stages. The old local files remain intact. Dedicated servers never import an arbitrary client save.
+2. Create a new character through the altar, then reopen it. It must open the existing map and grant no extra point or goods.
+3. Spend points, use a spell and take damage. Retreat, reopen, die/respawn in Minecraft, logout/rejoin and restart the server. Character state and current resources must remain; vanilla gear must not affect RPG damage.
+4. First clears must unlock the next stage, grant XP/goods/lore once and save. Replay grants no repeat first-clear award. The original five World 1 enemies, HP/damage definitions and `Patterns.java` are retained.
+
+## Test activity XP
+
+Create the character first, then use **Survival Mode with a real player**. Creative, spectator and fake players intentionally receive no activity XP. Check the character sheet's Adventurer XP; vanilla XP is separate. Rewards are aggregated into a subtle notice every five seconds.
+
+- **Mining:** mine naturally generated ore with a suitable tool. Diamond/emerald should award more than coal/copper. Mine plain stone: no XP. Place an ore block and break it: no XP. Replaced or already-rewarded ore positions remain excluded across reconnects and resets.
+- **Combat:** personally kill a nearby natural hostile mob (a summoned zombie is suitable for an admin fixture). Mob farms tagged as spawner/dispenser-origin, indirect automation/fake players and remote kills should not award. Category budgets bound repeated kills.
+- **Farming:** break mature wheat/carrot/potato/beetroot; immature crops give no XP. With a compatible right-click harvest/replant mod installed, harvest a mature crop by right click and verify one reward after its state changes. Repeated clicks without a mature-to-younger/removed transition give none. Test cancel-as-handled harvesting, and ensure break plus interaction callbacks do not double-count.
+- **Fishing:** cast and catch normally after moving recently. The cast must last at least 80 ticks; catch rewards have a 200-tick cooldown, a daily cap and recent-movement requirement. Fake/autonomous rod owners are excluded.
+- **Rates:** adjust `<world>/serverconfig/minebound-server.toml` in a test world. `activityXpRate=0` disables activity awards. Rates, level penalty and each category cap are configurable. Reconnect/restart must preserve consumed category budgets.
+
+Generic right-click state-transition compatibility is implemented and covered by the integrated fixture. Specific third-party farming mods with deferred harvests, tile-entity-only maturity or nonstandard state properties still need compatibility tests/adapters. The detector checks the next few server ticks; it does not infer a harvest from a click alone.
+
+## Test recovery and resources
+
+1. Record current HP/PP and `lastRecoveryTick` in a test character. Spend resources and enter another stage: resources must carry unchanged into the new fight. A first-clear victory does not heal.
+2. Reopen the altar repeatedly, reconnect, switch dimension, sleep and use `/time set`: none should award early recovery. Recovery uses Overworld `gameTime`, not daylight or wall-clock time.
+3. Allow 24,000 Overworld simulation ticks to pass (approximately 20 minutes at 20 TPS). When outside an active encounter, the next recovery check restores both resources and displays a notice. A second immediate check must not restore anything again.
+4. If the interval becomes eligible during a fight, recovery waits until the encounter is closed/settled. Paused/stopped single-player time does not advance the interval.
+5. Use a map herb after a completed/failed battle: its healing must remain saved rather than being replaced by the old battle snapshot. Check Undead's healing reduction.
+6. Wizard: try Arcane efficiency and INT improvements over consecutive first clears, using earned ethers strategically. The resource simulation verifies a spell-focused World 1 route without daily rest. Warlock: start with CHA-based Eldritch Blast, then compare CHA-based BASH, unlocked Bladeslinger/Psychic Blade's next-BASH combo and the finite 12-PP daily pact budget. Retreat/re-entry must not refresh Still Mind or that budget.
+
+## Test the Reset Relic
+
+1. In a test world, enter Creative and obtain the Reset Relic from Functional Blocks or `/give @s minebound:reset_relic`.
+2. Ordinary use and Survival use must do nothing. **Sneak + right-click in Creative** opens a confirmation lasting 20 seconds.
+3. Cancel first; the character must remain. Reopen, confirm, and verify return to the opening story/creation.
+4. Check all RPG identity, attributes, XP, nodes/legacy ranks, points, abilities, HP/PP, recovery/restoration tracking, goods, stage records and lore are reset. Logout/restart: the reset profile must load and require creation.
+5. Compare Minecraft inventory, equipped gear, vanilla XP and advancements before/after. They must be untouched. Other players cannot be targeted by the reset request. Backups are retained for administrator recovery.
+
+## Remaining acceptance work
+
+- Remote dedicated-server play, real network latency, disconnect/respawn edge cases and multiple simultaneous individual sessions need broader testing. Full voluntary parties/readiness/shared hearts are not implemented.
+- Playtest the entire World 1 sequence across all 24 race/class combinations and diverse hybrid routes. The core patterns are retained; status/skill interactions and the new persistent resource economy need human tuning.
+- Verify all supported GUI scales, long names, keyboard narration, panning/zooming, and frames across the five supplied sheets on additional displays. Screenshots verify the primary development display, not every renderer.
+- Multi-enemy area damage, curse spreading, more worlds, deeper spell combinations, audio feedback and fuller accessibility remain future content. Every visible purchasable node in this implementation has a working effect.
