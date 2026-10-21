@@ -59,6 +59,7 @@ public final class ProfileStore {
                 p.currentPp = bounded(root,"currentPp",p.created ? 0 : -1,10000,p.created ? p.maxPp() : -1);
                 p.lastRecoveryTick = root.has("lastRecoveryTick") ? root.get("lastRecoveryTick").getAsLong() : -1;
                 p.meditationRecoveryTick = root.has("meditationRecoveryTick") ? root.get("meditationRecoveryTick").getAsLong() : -2;
+                p.meditatedThisDay = root.has("meditatedThisDay") && root.get("meditatedThisDay").getAsBoolean();
                 p.pactPpThisDay = bounded(root,"pactPpThisDay",0,12,0);
                 p.introSeen = root.has("introSeen") && root.get("introSeen").getAsBoolean();
                 if (root.has("nodes")) for (var node : root.getAsJsonArray("nodes")) {

@@ -20,6 +20,7 @@ public final class CharacterProfile {
     public int currentHp = -1, currentPp = -1;
     public long lastRecoveryTick = -1;
     public long meditationRecoveryTick = -2;
+    public boolean meditatedThisDay;
     public int pactPpThisDay;
     public boolean introSeen;
     public final Set<String> nodes = new HashSet<>();

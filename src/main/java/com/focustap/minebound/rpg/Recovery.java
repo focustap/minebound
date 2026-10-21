@@ -10,10 +10,12 @@ public final class Recovery {
         if (inBattle || now - p.lastRecoveryTick < DAY) return false;
         p.currentHp = p.maxHp(); p.currentPp = p.maxPp(); p.lastRecoveryTick = now;
         p.pactPpThisDay = 0;
+        p.meditatedThisDay = false;
         return true;
     }
     public static void initialize(CharacterProfile p, long now) {
         p.currentHp = p.maxHp(); p.currentPp = p.maxPp(); p.lastRecoveryTick = now;
         p.pactPpThisDay = 0;
+        p.meditatedThisDay = false;
     }
 }

@@ -274,4 +274,3 @@ public final class MineboundScreen extends RetroScreen {
         super.onClose();
     }
 }
-

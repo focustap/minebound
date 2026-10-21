@@ -70,7 +70,9 @@ final class SkillWebScreen extends RetroScreen {
             boolean active = n.kind() == SkillGraph.Kind.ACTIVE;
             if (active) for (int row=-r;row<=r;row++) { int half=r-Math.abs(row); g.fill(nx-half,ny+row,nx+half+1,ny+row+1,color); }
             else if (n.kind() == SkillGraph.Kind.ATTRIBUTE) g.fill(nx-r,ny-r,nx+r+1,ny+r+1,color);
-            else { g.fill(nx-r+1,ny-r,nx+r,ny+r+1,color); g.fill(nx-r,ny-r+2,nx+r+1,ny+r-1,color); }
+            else if (n.kind() == SkillGraph.Kind.SPECIALIZATION) {
+                for (int row=-r;row<=r;row++) { int half=r-Math.abs(row)/2; g.fill(nx-half,ny+row,nx+half+1,ny+row+1,color); }
+            } else { g.fill(nx-r+1,ny-r,nx+r,ny+r+1,color); g.fill(nx-r,ny-r+2,nx+r+1,ny+r-1,color); }
             if (selected != null && selected.equals(n.id())) g.renderOutline(nx-r-2,ny-r-2,r*2+5,r*2+5,feedback > 0 ? FERN : GOLD);
             // Tiny icon: cross for attributes, slash for actives, core gem for passives.
             if (active) line(g,nx-2,ny+2,nx+2,ny-2,INK);
@@ -110,6 +112,7 @@ final class SkillWebScreen extends RetroScreen {
     }
     @Override public boolean mouseReleased(double mx,double my,int button) { dragging=false; return super.mouseReleased(mx,my,button); }
     @Override public boolean mouseScrolled(double mx,double my,double horizontal,double vertical) {
+        if (vertical==0) return false;
         if (my < y()+44 || my > y()+157) return super.mouseScrolled(mx,my,horizontal,vertical);
         float old=zoom; zoom = Math.clamp(zoom*(vertical > 0 ? 1.15f : .87f),.16f,1.6f);
         panX += (float)(mx-x()-155)*(1/zoom-1/old); panY += (float)(my-y()-104)*(1/zoom-1/old);

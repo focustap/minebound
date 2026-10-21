@@ -42,7 +42,7 @@ public final class Battle {
     public boolean ability(Ability a) {
         if (state != State.COMMAND || !profile.abilities().contains(a)) return false;
         int cost = profile.cost(a);
-        if (a == Ability.MEDITATE && (meditationUsed || profile.meditationRecoveryTick == profile.lastRecoveryTick)) {
+        if (a == Ability.MEDITATE && (meditationUsed || profile.meditatedThisDay)) {
             message = "Still Mind was used during this recovery day."; return false;
         }
         if (pp < cost) { message = "Need " + cost + " PP for " + a.label() + "."; return false; }
@@ -63,9 +63,9 @@ public final class Battle {
         if (a == Ability.REJUVENATE) rejuvenationRounds = 3;
         if (a == Ability.RECKLESS_STRIKE) reckless = 1;
         if (a == Ability.PSYCHIC_BLADE) bladeCombo = 3 + Math.max(0,profile.modifier(Attribute.CHA)) + SkillGraph.bonus(profile,"pact");
-        if (a == Ability.DRAIN) pp = Math.min(profile.maxPp(),pp + 1);
-        if (a == Ability.MEDITATE) { meditationUsed = true; profile.meditationRecoveryTick = profile.lastRecoveryTick; pp = Math.min(profile.maxPp(),pp + 4); }
-        if (a == Ability.EMBER_NOVA && enemyHp == 0) pp = Math.min(profile.maxPp(),pp + 2);
+        if (a == Ability.DRAIN) pp = Math.min(profile.maxPp(),pp + Math.min(1,Math.max(0,cost-1)));
+        if (a == Ability.MEDITATE) { meditationUsed = true; profile.meditatedThisDay = true; profile.meditationRecoveryTick = profile.lastRecoveryTick; pp = Math.min(profile.maxPp(),pp + 4); }
+        if (a == Ability.EMBER_NOVA && enemyHp == 0) pp = Math.min(profile.maxPp(),pp + Math.min(2,Math.max(0,cost-1)));
         message = a.label() + ": " + damage + " damage, " + healing + " healing.";
         next(); return true;
     }

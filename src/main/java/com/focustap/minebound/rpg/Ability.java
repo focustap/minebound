@@ -14,7 +14,7 @@ public enum Ability {
     BARRIER(CharacterClass.WIZARD, Attribute.INT, 3, "Guard and gain an arcane shield for one phase."),
     EMBER_NOVA(CharacterClass.WARLOCK, Attribute.CHA, 5, "Destructive burst; refunds PP on a finishing blow."),
     HEX(CharacterClass.WARLOCK, Attribute.CHA, 3, "Curse deals damage over time and weakens the enemy."),
-    DRAIN(CharacterClass.WARLOCK, Attribute.CHA, 3, "Life drain; also restores 1 PP (never a net gain)."),
+    DRAIN(CharacterClass.WARLOCK, Attribute.CHA, 3, "Life drain; refunds up to 1 PP, always costs at least 1."),
     BACKSTAB(CharacterClass.ROGUE, Attribute.DEX, 3, "Precise strike; stronger against a debuffed enemy."),
     FEINT(CharacterClass.ROGUE, Attribute.DEX, 2, "Damage and weaken the next enemy attack."),
     BULWARK(CharacterClass.WARRIOR, Attribute.CON, 3, "Guard with a strong finite shield."),

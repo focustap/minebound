@@ -20,7 +20,7 @@ public final class CharacterService {
         public final ProfileStore store;
         public CharacterProfile profile;
         public Battle battle;
-        public boolean open, resetArmed, dirty;
+        public boolean open, resetArmed, dirty, settled;
         public long resetExpires, inputTick = -1, actionTick = -1;
         public float inputX, inputY;
         public boolean focus;
@@ -93,6 +93,7 @@ public final class CharacterService {
                 case "START" -> {
                     if (active(s)) break;
                     recover(player,s); s.battle = new Battle(s.profile,Integer.parseInt(c.data()));
+                    s.settled=false;
                     s.notice = Story.stage(s.battle.stage).intro();
                     s.battle.message = s.notice;
                 }
@@ -121,12 +122,14 @@ public final class CharacterService {
     }
     public static boolean active(Session s) { return s.battle != null && (s.battle.state == Battle.State.COMMAND || s.battle.state == Battle.State.DODGE); }
     private static void resolve(Session s) {
-        if (s.battle == null) return;
+        if (s.battle == null || s.settled) return;
         s.battle.commitResources();
         if (s.battle.state == Battle.State.WON) {
+            s.settled=true;
             int xp = s.profile.victory(s.battle.stage);
             if (xp > 0) s.notice = "+" + xp + " Adventurer XP. " + Story.stage(s.battle.stage).defeat();
         } else if (s.battle.state == Battle.State.LOST) {
+            s.settled=true;
             s.notice="Your heart falls silent. Use an earned Minebound herb on the map, or return after daily recovery.";
         }
     }

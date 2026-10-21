@@ -85,10 +85,12 @@ class ExpansionRulesTest {
         p.nodes.add("arcane_meditate"); p.currentPp=0;
         Battle b=new Battle(p,0); assertTrue(b.ability(Ability.MEDITATE)); b.retreat(); assertEquals(4,p.currentPp);
         b=new Battle(p,0); assertFalse(b.ability(Ability.MEDITATE));
+        p.lastRecoveryTick=100; assertFalse(Recovery.check(p,1,false));
+        b=new Battle(p,0); assertFalse(b.ability(Ability.MEDITATE)); // clock rollback cannot refresh the spell
         p.currentPp=0; p.pactPpThisDay=12; b=new Battle(p,0);
         for (int i=0;i<3;i++) { b.bash(); if (b.state==Battle.State.DODGE) b.state=Battle.State.COMMAND; }
         assertEquals(0,b.pp);
-        assertTrue(Recovery.check(p,Recovery.DAY,false)); assertEquals(0,p.pactPpThisDay);
+        assertTrue(Recovery.check(p,Recovery.DAY+1,false)); assertEquals(0,p.pactPpThisDay);
     }
     @Test void resetAggregateContainsNoInheritedProgressAndDoesNotMutateOldSnapshot() throws Exception {
         CharacterProfile old=CharacterRulesTest.character(Race.UNDEAD,CharacterClass.WARLOCK);
@@ -111,5 +113,12 @@ class ExpansionRulesTest {
             p.currentPp=p.maxPp(); Battle b=new Battle(p,0); assertTrue(b.ability(a),a.name());
             assertEquals(Battle.State.DODGE,b.state);
         }
+    }
+    @Test void efficiencyAndRefundsCannotMakeLifeDrainFree() {
+        CharacterProfile p=CharacterRulesTest.character(Race.GNOME,CharacterClass.WARLOCK);
+        p.nodes.addAll(List.of("arcane_3","destruction_4","affliction_drain"));
+        Battle b=new Battle(p,0); int before=b.pp;
+        assertEquals(1,p.cost(Ability.DRAIN)); assertTrue(b.ability(Ability.DRAIN));
+        assertEquals(before-1,b.pp);
     }
 }
