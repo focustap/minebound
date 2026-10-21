@@ -13,13 +13,15 @@ abstract class RetroScreen extends Screen {
     int x() { return (width - 310) / 2; }
     int y() { return (height - 230) / 2; }
     Button button(String label, int dx, int dy, int w, Runnable action) {
-        return addRenderableWidget(Button.builder(Component.literal(label), b -> action.run())
-                .bounds(x() + dx, y() + dy, w, 20).build());
+        return addRenderableWidget(new RpgButton(x()+dx,y()+dy,w,label,action));
     }
     void text(GuiGraphics g, String s, int dx, int dy, int color) {
+        g.fill(x()+dx-1,y()+dy-1,x()+dx+font.width(s)+1,y()+dy+9,0xE6171426);
         g.drawString(font, s, x() + dx, y() + dy, color, false);
     }
     void wrap(GuiGraphics g, String s, int dx, int dy, int w, int color) {
+        int rows=font.split(Component.literal(s),w).size();
+        g.fill(x()+dx-1,y()+dy-1,x()+dx+w+1,y()+dy+rows*9+1,0xE6171426);
         g.drawWordWrap(font, Component.literal(s), x() + dx, y() + dy, w, color);
     }
     @Override public void renderBackground(GuiGraphics g, int mx, int my, float partial) {
@@ -27,6 +29,9 @@ abstract class RetroScreen extends Screen {
         g.fill(x(), y(), x() + 310, y() + 230, CREAM);
         g.fill(x() + 3, y() + 3, x() + 307, y() + 227, PLUM);
         g.fill(x() + 6, y() + 6, x() + 304, y() + 224, INK);
+        Art.draw(g,"sheet",x()+7,y()+7,296,216);
+        // Opaque panels keep text sharp. Never invoke vanilla background blur.
+        g.fill(x()+10,y()+8,x()+300,y()+25,0xDD171426);
         text(g, "MINEBOUND", 12, 12, GOLD);
         drawPage(g);
     }

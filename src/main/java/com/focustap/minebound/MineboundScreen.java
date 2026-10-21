@@ -6,12 +6,12 @@ import org.lwjgl.glfw.GLFW;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
+import com.focustap.minebound.net.Protocol;
 
 /** Menu/controller only. Character rules, persistence and combat live in separate systems. */
 public final class MineboundScreen extends RetroScreen {
-    private enum View { MAP, SHEET, DETAILS, SKILLS, BATTLE, ABILITIES, DODGE, RESULTS }
-    private final ProfileStore store;
-    private final CharacterProfile profile;
+    private enum View { MAP, SHEET, DETAILS, BATTLE, ABILITIES, GOODS, LORE, DODGE, RESULTS }
+    private CharacterProfile profile;
     private View view = View.MAP;
     private CharacterClass selectedPath = CharacterClass.WARRIOR;
     private Battle battle;
@@ -19,11 +19,15 @@ public final class MineboundScreen extends RetroScreen {
     private String status = "Choose an unlocked stage.";
     private int animation;
 
-    public MineboundScreen(ProfileStore store, CharacterProfile profile) {
-        super("Minebound"); this.store = store; this.profile = profile;
+    private long recoveryRemaining;
+    private int abilityPage, detailsPage, lorePage;
+    private int selectedStage, noticeTicks;
+    private static final int[] MAP_X={49,76,151,207,251}, MAP_Y={122,83,96,86,74};
+    public MineboundScreen(CharacterProfile profile, Battle battle) {
+        super("Minebound"); this.profile = profile; this.battle = battle;
     }
     @Override protected void init() {
-        if (!profile.created) { minecraft.setScreen(new CharacterCreationScreen(store, profile)); return; }
+        if (!profile.created) { minecraft.setScreen(new CharacterCreationScreen(profile)); return; }
         rebuild();
     }
     private void navigate(View next) {
@@ -35,174 +39,185 @@ public final class MineboundScreen extends RetroScreen {
             case MAP -> {
                 for (int i = 0; i < 5; i++) {
                     final int stage = i;
-                    button("1-" + (i + 1), 12 + i * 58, 76, 53, () -> {
-                        battle = new Battle(profile, stage); navigate(View.BATTLE);
-                    }).active = profile.unlocked(stage);
+                    var marker = addRenderableWidget(new StageMarker(x()+MAP_X[i]-10,y()+MAP_Y[i]-10,i,
+                            (profile.clearedMask & (1<<i)) != 0,() -> { selectedStage=stage; noticeTicks=0; rebuild(); }));
+                    marker.active=profile.unlocked(stage);
                 }
-                button("CHARACTER", 12, 152, 138, () -> navigate(View.SHEET));
-                button("SKILL WEB", 160, 152, 138, () -> navigate(View.SKILLS));
-                button("EXIT", 105, 184, 100, this::onClose);
+                button("ENTER",220,165,78,() -> Protocol.send("START",Integer.toString(selectedStage))).active=profile.unlocked(selectedStage);
+                button("SHEET",12,199,67,() -> navigate(View.SHEET));
+                button("SKILLS",85,199,67,() -> minecraft.setScreen(new SkillWebScreen(this,profile)));
+                button("GOODS",158,199,67,() -> navigate(View.GOODS));
+                button("LORE",231,199,67,() -> navigate(View.LORE));
             }
             case SHEET -> {
                 for (Attribute a : Attribute.values()) {
                     int col = a.ordinal() % 3, row = a.ordinal() / 3;
                     var increase = button("+", 78 + col * 96, 112 + row * 25, 22, () -> {
-                        if (profile.spendAttribute(a)) save(); rebuild();
+                        Protocol.send("ATTRIBUTE",a.name());
                     });
                     increase.active = profile.attributePoints > 0 && profile.attributes[a.ordinal()] < 18;
                     increase.setTooltip(Tooltip.create(Component.literal(a.description)));
                 }
                 button("BONUSES", 12, 199, 90, () -> navigate(View.DETAILS));
-                button("SKILL WEB", 110, 199, 90, () -> navigate(View.SKILLS));
+                button("SKILL WEB", 110, 199, 90, () -> minecraft.setScreen(new SkillWebScreen(this,profile)));
                 button("MAP", 208, 199, 90, () -> navigate(View.MAP));
             }
             case DETAILS -> {
-                button("ATTRIBUTES", 12, 199, 138, () -> navigate(View.SHEET));
-                button("WORLD MAP", 160, 199, 138, () -> navigate(View.MAP));
-            }
-            case SKILLS -> {
-                for (CharacterClass path : CharacterClass.values()) {
-                    button(path.label.substring(0, 3).toUpperCase() + " " + profile.rank(path), 12 + path.ordinal() * 58,
-                            58, 53, () -> { selectedPath = path; rebuild(); });
-                }
-                button("INVEST +1", 12, 173, 138, () -> {
-                    if (profile.spendSkill(selectedPath)) { save(); status = selectedPath.label + " path advanced."; }
-                    rebuild();
-                }).active = profile.skillPoints > 0 && profile.rank(selectedPath) < 3
-                        && (profile.rank(selectedPath) == 0 || java.util.Arrays.stream(profile.paths).sum() >= 2);
-                button("CHARACTER", 160, 173, 138, () -> navigate(View.SHEET));
-                button("WORLD MAP", 105, 199, 100, () -> navigate(View.MAP));
+                button("<",12,199,32,() -> { detailsPage=Math.max(0,detailsPage-1); rebuild(); });
+                button("SHEET",50,199,100,() -> navigate(View.SHEET));
+                button("MAP",160,199,100,() -> navigate(View.MAP));
+                button(">",266,199,32,() -> { detailsPage=Math.min((profile.abilities().size()-1)/6,detailsPage+1); rebuild(); });
             }
             case BATTLE -> {
-                button("BASH", 12, 167, 90, () -> { battle.bash(); afterCommand(); });
+                button("BASH", 12, 167, 90, () -> Protocol.send("BASH",""));
                 button("ABILITY", 110, 167, 90, () -> navigate(View.ABILITIES));
-                button("DEFEND", 208, 167, 90, () -> { battle.defend(); afterCommand(); });
-                button("RETREAT", 105, 196, 100, () -> { battle.retreat(); status = "Retreated. No rewards."; navigate(View.MAP); });
+                button("DEFEND", 208, 167, 90, () -> Protocol.send("DEFEND",""));
+                button("GOODS", 12, 196, 138, () -> navigate(View.GOODS));
+                button("RETREAT", 160, 196, 138, () -> { Protocol.send("RETREAT",""); navigate(View.MAP); });
             }
             case ABILITIES -> {
                 var abilities = profile.abilities();
-                for (int i = 0; i < abilities.size(); i++) {
+                for (int i = abilityPage * 6; i < Math.min(abilities.size(),abilityPage * 6 + 6); i++) {
                     Ability a = abilities.get(i);
-                    var ability = button(a.label() + " " + profile.cost(a) + " PP", 12, 46 + i * 23, 141, () -> {
-                        battle.ability(a); afterCommand();
+                    var ability = button(a.label() + " " + profile.cost(a) + " PP", 12, 46 + (i % 6) * 23, 141, () -> {
+                        Protocol.send("ABILITY",a.name());
                     });
                     ability.active = battle.pp >= profile.cost(a);
                     ability.setTooltip(Tooltip.create(Component.literal(a.description + " Scales with " + a.scaling + ".")));
                 }
+                button("<", 12, 199, 50, () -> { abilityPage = Math.max(0,abilityPage - 1); rebuild(); });
                 button("BACK", 105, 199, 100, () -> navigate(View.BATTLE));
+                button(">", 248, 199, 50, () -> { abilityPage = Math.min((abilities.size()-1)/6,abilityPage + 1); rebuild(); });
             }
-            case RESULTS -> button("WORLD MAP", 80, 192, 150, () -> navigate(View.MAP));
+            case GOODS -> {
+                button("HERB x" + profile.goods.getOrDefault("herb",0),12,85,138,() -> Protocol.send("GOOD","herb"));
+                button("ETHER x" + profile.goods.getOrDefault("ether",0),160,85,138,() -> Protocol.send("GOOD","ether"));
+                button("BACK",105,199,100,() -> navigate(battle != null && battle.state == Battle.State.COMMAND ? View.BATTLE : View.MAP));
+            }
+            case LORE -> {
+                button("<",12,199,50,() -> { lorePage=Math.max(0,lorePage-1); rebuild(); });
+                button("MAP",105,199,100,() -> navigate(View.MAP));
+                button(">",248,199,50,() -> { lorePage=Math.min(4,lorePage+1); rebuild(); });
+            }
+            case RESULTS -> button("WORLD MAP", 80, 199, 150, () -> navigate(View.MAP));
             case DODGE -> { }
         }
     }
-    private boolean save() {
-        try { store.save(profile); return true; }
-        catch (IOException e) { status = "Save failed. Check folder permissions."; return false; }
-    }
-    @Override public void removed() {
-        // Retry failed writes on exit; the last valid file is retained as .bak.
-        if (profile.created) save();
-        super.removed();
-    }
-    private void afterCommand() {
-        if (battle.state == Battle.State.WON) {
-            int award = profile.victory(battle.stage);
-            status = award == 0 ? "Practice clear. Already claimed rewards." : "+" + award + " XP! Level " + profile.level() + ".";
-            save(); navigate(View.RESULTS);
-        } else if (battle.state == Battle.State.DODGE) navigate(View.DODGE);
-        else navigate(View.BATTLE);
+    void accept(Protocol.Snapshot snapshot) {
+        Battle.State before = battle == null ? null : battle.state;
+        profile = snapshot.profile(); battle = snapshot.battle(); recoveryRemaining = snapshot.recoveryRemaining();
+        if (!snapshot.notice().isEmpty()) { status = snapshot.notice(); noticeTicks=160; }
+        if (battle != null) {
+            if (battle.state == Battle.State.DODGE && view != View.DODGE) navigate(View.DODGE);
+            else if ((battle.state == Battle.State.WON || battle.state == Battle.State.LOST) && view == View.DODGE) navigate(View.RESULTS);
+            else if (battle.state == Battle.State.WON && before != Battle.State.WON) navigate(View.RESULTS);
+            else if (battle.state == Battle.State.COMMAND && (before == null || before == Battle.State.DODGE)) navigate(View.BATTLE);
+        }
+        if (view != View.DODGE) rebuild();
     }
     @Override public void tick() {
-        super.tick(); animation++;
+        super.tick(); animation++; if (noticeTicks>0) noticeTicks--;
         if (view != View.DODGE) return;
-        battle.update((right ? 1 : 0) - (left ? 1 : 0), (down ? 1 : 0) - (up ? 1 : 0), focus);
-        if (battle.state == Battle.State.LOST) { status = "Defeated. Adjust your build or try again."; navigate(View.RESULTS); }
-        else if (battle.state == Battle.State.COMMAND) navigate(View.BATTLE);
+        Protocol.send("INPUT","",(right ? 1 : 0) - (left ? 1 : 0),(down ? 1 : 0) - (up ? 1 : 0),focus);
     }
     @Override void drawPage(GuiGraphics g) {
         switch (view) {
             case MAP -> drawMap(g);
             case SHEET -> drawSheet(g);
             case DETAILS -> drawDetails(g);
-            case SKILLS -> drawSkills(g);
+            case GOODS -> {
+                text(g,"MINEBOUND GOODS",12,30,GOLD);
+                wrap(g,"Herb: restore 12 HP (9 for Undead). Ether: restore 6 PP. In combat, using a good consumes your turn.",12,48,284,CREAM);
+                wrap(g,status,12,126,284,LAVENDER);
+                text(g,"Recovery in " + (recoveryRemaining+19)/20 + " Overworld seconds",12,166,FERN);
+            }
+            case LORE -> {
+                text(g,"THE ALTAR'S MEMORY",12,30,GOLD);
+                text(g,Story.stage(lorePage).name(),12,50,FERN);
+                wrap(g,profile.lore.contains("stage_"+lorePage) ? Story.stage(lorePage).lore()
+                        : "This page is still missing. Clear stage 1-"+(lorePage+1)+" to recover its memory.",12,78,284,LAVENDER);
+                text(g,"MEMORY "+(lorePage+1)+" / 5",12,178,GOLD);
+            }
             case BATTLE -> drawBattle(g);
             case ABILITIES -> drawAbilities(g);
             case DODGE -> drawDodge(g);
             case RESULTS -> {
-                text(g, battle.state == Battle.State.WON ? "VICTORY!" : "DEFEAT", 120, 60, battle.state == Battle.State.WON ? FERN : RED);
-                wrap(g, status, 18, 93, 274, CREAM);
-                text(g, "Level " + profile.level() + " / " + profile.xp + " XP", 18, 128, GOLD);
-                text(g, "Attributes: " + profile.attributePoints + " / Skills: " + profile.skillPoints, 18, 145, LAVENDER);
+                text(g, battle.state == Battle.State.WON ? "VICTORY!" : "DEFEAT", 120, 32, battle.state == Battle.State.WON ? FERN : RED);
+                EnemySprites.draw(g,battle.enemy.id(),x()+155,y()+72,animation);
+                wrap(g, status, 18, 104, 274, CREAM);
+                text(g, "Level " + profile.level() + " / " + profile.xp + " XP", 18, 165, GOLD);
+                text(g, "Attributes: " + profile.attributePoints + " / Skills: " + profile.skillPoints, 18, 182, LAVENDER);
             }
         }
     }
     private void drawMap(GuiGraphics g) {
+        Art.draw(g,"woods",x()+7,y()+27,296,119);
+        g.fill(x()+9,y()+28,x()+301,y()+43,0xDD171426);
         text(g, "WORLD 1: WHISPERING WOODS", 12, 31, CREAM);
-        text(g, profile.name + " / Lv " + profile.level() + " " + profile.startingClass.label, 12, 49, LAVENDER);
-        for (int i = 0; i < 5; i++) {
-            int color = (profile.clearedMask & (1 << i)) != 0 ? FERN : profile.unlocked(i) ? GOLD : PLUM;
-            g.fill(x() + 28 + i * 58, y() + 103, x() + 40 + i * 58, y() + 113, color);
+        text(g,Integer.bitCount(profile.clearedMask)+"/5",276,31,GOLD);
+        g.fill(x()+9,y()+148,x()+301,y()+194,0xEE171426);
+        text(g,"1-"+(selectedStage+1)+" / "+Story.stage(selectedStage).name(),12,152,GOLD);
+        wrap(g,noticeTicks>0 ? status : Story.stage(selectedStage).description(),12,167,199,LAVENDER);
+        // Dotted winding route follows the illustrated clearings, with completed links illuminated.
+        for (int i=0;i<4;i++) for (int dot=1;dot<8;dot++) {
+            int px=MAP_X[i]+(MAP_X[i+1]-MAP_X[i])*dot/8;
+            int py=MAP_Y[i]+(MAP_Y[i+1]-MAP_Y[i])*dot/8 + (int)(Math.sin(dot*Math.PI/8)*5);
+            g.fill(x()+px,y()+py,x()+px+2,y()+py+2,profile.unlocked(i+1) ? GOLD : 0xFF6D5E78);
         }
-        text(g, "1-3 MINIBOSS       1-5 WORLD BOSS", 12, 128, GOLD);
-        wrap(g, status, 12, 211, 285, LAVENDER);
     }
     private void drawSheet(GuiGraphics g) {
         text(g, profile.name + " / " + profile.race.label + " " + profile.startingClass.label, 12, 30, CREAM);
         text(g, "LEVEL " + profile.level() + "  XP " + profile.xp + "/" + CharacterProfile.threshold(profile.level() + 1), 12, 45, GOLD);
-        int hp = battle == null ? profile.maxHp() : battle.hp;
-        int pp = battle == null ? profile.maxPp() : battle.pp;
+        int hp = profile.currentHp;
+        int pp = profile.currentPp;
         text(g, "HP " + hp + "/" + profile.maxHp() + "  PP " + pp + "/" + profile.maxPp(), 12, 60, CREAM);
         text(g, "Points: " + profile.attributePoints + " ATTR / " + profile.skillPoints + " SKILL", 12, 75, GOLD);
+        int levelStart=CharacterProfile.threshold(profile.level()), levelEnd=CharacterProfile.threshold(profile.level()+1);
+        g.fill(x()+12,y()+86,x()+296,y()+90,PLUM);
+        g.fill(x()+12,y()+86,x()+12+Math.clamp((profile.xp-levelStart)*284/Math.max(1,levelEnd-levelStart),0,284),y()+90,FERN);
         text(g, "BASH " + CombatRules.bash(profile, 1) + "  SPEED " + String.format(java.util.Locale.ROOT, "%.2f", profile.speed())
                 + "  CLEARS " + Integer.bitCount(profile.clearedMask) + "/5", 12, 92, FERN);
         for (Attribute a : Attribute.values()) text(g, a + " " + profile.stat(a), 12 + a.ordinal() % 3 * 96, 118 + a.ordinal() / 3 * 25, CREAM);
         wrap(g, profile.race.passive, 12, 164, 284, LAVENDER);
+        text(g,profile.hybridIdentity().isEmpty() ? "Build: "+profile.startingClass.label : "Build: "+profile.hybridIdentity(),12,188,GOLD);
         // Full ability effects and class/path bonuses are inspectable in the skill web.
-    }
-    private void drawSkills(GuiGraphics g) {
-        text(g, "MULTICLASS WEB / POINTS " + profile.skillPoints, 12, 30, GOLD);
-        text(g, "COMMON ROOT ---- EVERY PATH IS OPEN", 12, 45, FERN);
-        CharacterClass c = selectedPath;
-        text(g, c.label + "  Rank " + profile.rank(c) + "/3", 12, 85, CREAM);
-        String bonus = switch(c) {
-            case WARRIOR -> "+1 BASH damage per rank";
-            case ROGUE -> "+0.05 heart speed per rank";
-            case WIZARD -> "+1 max PP per rank";
-            case DRUID -> "+1 restorative healing per rank";
-            case PALADIN -> "+1 max HP per rank";
-        };
-        text(g, bonus, 12, 100, FERN);
-        wrap(g, "Rank 2: learn " + c.ability + (c == CharacterClass.DRUID ? " + MEND" : "")
-                + ". Rank 2 needs two points anywhere in the web. Rank 3 improves scaling.", 12, 115, 284, LAVENDER);
-        wrap(g, "Starting passive: " + profile.startingClass.passive, 12, 147, 284, GOLD);
     }
     private void drawDetails(GuiGraphics g) {
         text(g, "CHARACTER / ACTIVE & PASSIVE BONUSES", 12, 30, GOLD);
         wrap(g, profile.startingClass.passive, 12, 47, 284, FERN);
         wrap(g, profile.race.passive, 12, 73, 284, LAVENDER);
-        text(g, "UNLOCKED ABILITIES: DAMAGE / HEAL / PP", 12, 104, CREAM);
+        text(g, "ABILITIES "+(detailsPage+1)+": DAMAGE / HEAL / PP", 12, 104, CREAM);
         int row = 120;
-        for (Ability a : profile.abilities()) {
+        for (Ability a : profile.abilities().stream().skip(detailsPage*6L).limit(6).toList()) {
             text(g, a.label(), 12, row, GOLD);
             text(g, CombatRules.abilityDamage(profile, a) + " / " + CombatRules.healing(profile, a)
                     + " / " + profile.cost(a), 181, row, FERN);
             row += 12;
         }
         // Aggregate path ranks are applied in the derived values; inspect individual paths in the web.
-        text(g, "W " + profile.paths[0] + " / R " + profile.paths[1] + " / M " + profile.paths[2]
-                + " / D " + profile.paths[3] + " / P " + profile.paths[4], 12, 189, LAVENDER);
+        String investments=profile.nodes.stream().map(SkillGraph.NODES::get).filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.groupingBy(SkillGraph.Node::branch,java.util.stream.Collectors.counting()))
+                .entrySet().stream().sorted(java.util.Map.Entry.<String,Long>comparingByValue().reversed())
+                .limit(2).map(e -> e.getKey()+" "+e.getValue()).collect(java.util.stream.Collectors.joining(" / "));
+        text(g,investments.isEmpty() ? "No specialization nodes purchased." : investments,12,189,LAVENDER);
     }
     private void drawBattle(GuiGraphics g) {
+        Art.draw(g,"woods",x()+10,y()+57,290,66);
+        g.fill(x()+10,y()+57,x()+300,y()+123,0x880E0B19);
         text(g, battle.enemy.name() + " / TURN " + battle.turn, 12, 30, CREAM);
         text(g, "FOE " + battle.enemyHp + "/" + battle.enemy.hp() + "  PHASE " + battle.phase(), 12, 45, RED);
         EnemySprites.draw(g, battle.enemy.id(), x() + 155, y() + 94, animation);
         text(g, "HP " + battle.hp + "/" + profile.maxHp() + "   PP " + battle.pp + "/" + profile.maxPp(), 12, 127, CREAM);
+        g.fill(x()+12,y()+137,x()+145,y()+140,PLUM);
+        g.fill(x()+12,y()+137,x()+12+battle.hp*133/Math.max(1,profile.maxHp()),y()+140,FERN);
+        g.fill(x()+160,y()+137,x()+298,y()+140,PLUM);
+        g.fill(x()+160,y()+137,x()+160+battle.pp*138/Math.max(1,profile.maxPp()),y()+140,LAVENDER);
         wrap(g, battle.message, 12, 143, 285, GOLD);
     }
     private void drawAbilities(GuiGraphics g) {
         text(g, "ABILITIES / PP " + battle.pp + "/" + profile.maxPp(), 12, 30, GOLD);
         int i = 0;
-        for (Ability a : profile.abilities()) {
+        for (Ability a : profile.abilities().stream().skip(abilityPage*6L).limit(6).toList()) {
             text(g, CombatRules.abilityDamage(profile, a) + " DMG / " + CombatRules.healing(profile, a) + " HP", 164, 51 + i * 23, FERN);
             i++;
         }
@@ -255,7 +270,8 @@ public final class MineboundScreen extends RetroScreen {
     }
     @Override public void onClose() {
         // Closing during combat is a retreat. Rewards only come from a completed victory.
-        if (battle != null && (view == View.DODGE || view == View.BATTLE || view == View.ABILITIES)) battle.retreat();
+        Protocol.send("CLOSE","");
         super.onClose();
     }
 }
+

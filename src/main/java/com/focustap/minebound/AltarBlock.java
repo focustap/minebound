@@ -18,9 +18,8 @@ public final class AltarBlock extends Block {
     @Override
     public InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
                                                Player player, BlockHitResult hit) {
-        if (level.isClientSide) {
-            ClientEntry.openAltar();
-        }
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)
+            com.focustap.minebound.server.CharacterService.open(serverPlayer);
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
 }

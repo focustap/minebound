@@ -2,6 +2,7 @@ package com.focustap.minebound;
 
 import com.focustap.minebound.rpg.*;
 import java.io.IOException;
+import com.focustap.minebound.net.Protocol;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
@@ -9,13 +10,14 @@ import net.minecraft.network.chat.Component;
 
 /** Reversible creation draft. Only confirmation grants the first skill point. */
 final class CharacterCreationScreen extends RetroScreen {
-    private final ProfileStore store;
     private final CharacterProfile profile;
     private int step;
     private String error = "";
-    CharacterCreationScreen(ProfileStore store, CharacterProfile profile) {
-        super("Create your Minebound character"); this.store = store; this.profile = profile;
+    private boolean pending;
+    CharacterCreationScreen(CharacterProfile profile) {
+        super("Create your Minebound character"); this.profile = profile;
     }
+    void serverNotice(String value) { error = value; pending = false; rebuild(); }
     @Override protected void init() { rebuild(); }
     private void rebuild() {
         clearWidgets();
@@ -53,15 +55,12 @@ final class CharacterCreationScreen extends RetroScreen {
         });
         button(step == 3 ? "CONFIRM" : "NEXT", 207, 200, 91, () -> {
             if (step < 3) { step++; rebuild(); return; }
-            if (!profile.confirm()) { error = "Spend all points and enter a name."; return; }
-            try {
-                store.save(profile);
-                minecraft.setScreen(new MineboundScreen(store, profile));
-            } catch (IOException e) {
-                profile.created = false; profile.skillPoints = 0;
-                error = "Save failed. Check folder permissions.";
-            }
-        }).active = step != 2 || profile.creationRemaining() == 0;
+            if (pending) return;
+            if (profile.creationRemaining() != 0 || profile.name.isBlank()) { error = "Spend all points and enter a name."; return; }
+            pending = true;
+            Protocol.send("CREATE",Protocol.JSON.toJson(new Protocol.Create(profile.name,profile.race.name(),profile.startingClass.name(),profile.attributes)));
+            rebuild();
+        }).active = !pending && (step != 2 || profile.creationRemaining() == 0);
     }
     @Override void drawPage(GuiGraphics g) {
         text(g, (step + 1) + "/4  " + new String[]{"CHOOSE RACE", "CHOOSE STARTING CLASS", "POINT BUY", "REVIEW CHARACTER"}[step], 12, 30, CREAM);
@@ -99,4 +98,5 @@ final class CharacterCreationScreen extends RetroScreen {
         }
         if (!error.isEmpty()) text(g, error, 12, 188, RED);
     }
+    @Override public void onClose() { Protocol.send("CLOSE",""); super.onClose(); }
 }

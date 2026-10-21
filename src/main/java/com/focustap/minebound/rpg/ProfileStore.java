@@ -40,12 +40,12 @@ public final class ProfileStore {
             p.startingClass = CharacterClass.valueOf(root.get("startingClass").getAsString());
             int[] attributes = JSON.fromJson(root.get("attributes"), int[].class);
             int[] paths = JSON.fromJson(root.get("paths"), int[].class);
-            if (attributes.length != 6 || paths.length != 5) throw new IllegalArgumentException("Invalid stat arrays");
+            if (attributes.length != 6 || (paths.length != 5 && paths.length != 6)) throw new IllegalArgumentException("Invalid stat arrays");
             for (int i = 0; i < 6; i++) {
                 if (attributes[i] < 8 || attributes[i] > 18) throw new IllegalArgumentException("Invalid attribute");
                 p.attributes[i] = attributes[i];
             }
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < paths.length; i++) {
                 if (paths[i] < 0 || paths[i] > 3) throw new IllegalArgumentException("Invalid skill rank");
                 p.paths[i] = paths[i];
             }
@@ -54,6 +54,31 @@ public final class ProfileStore {
             p.attributePoints = bounded(root, "attributePoints", 0, 100, 0);
             p.clearedMask = bounded(root, "clearedMask", 0, 31, 0);
             if ((p.clearedMask & (p.clearedMask + 1)) != 0) throw new IllegalArgumentException("Non-sequential stage progress");
+            if (schema >= 3) {
+                p.currentHp = bounded(root,"currentHp",p.created ? 0 : -1,10000,p.created ? p.maxHp() : -1);
+                p.currentPp = bounded(root,"currentPp",p.created ? 0 : -1,10000,p.created ? p.maxPp() : -1);
+                p.lastRecoveryTick = root.has("lastRecoveryTick") ? root.get("lastRecoveryTick").getAsLong() : -1;
+                p.meditationRecoveryTick = root.has("meditationRecoveryTick") ? root.get("meditationRecoveryTick").getAsLong() : -2;
+                p.pactPpThisDay = bounded(root,"pactPpThisDay",0,12,0);
+                p.introSeen = root.has("introSeen") && root.get("introSeen").getAsBoolean();
+                if (root.has("nodes")) for (var node : root.getAsJsonArray("nodes")) {
+                    if (!SkillGraph.NODES.containsKey(node.getAsString())) throw new IllegalArgumentException("Unknown skill node");
+                    p.nodes.add(node.getAsString());
+                }
+                if (root.has("lore")) for (var entry : root.getAsJsonArray("lore")) p.lore.add(entry.getAsString());
+                if (root.has("goods")) for (var entry : root.getAsJsonObject("goods").entrySet()) {
+                    int amount = entry.getValue().getAsInt();
+                    if (amount < 0 || amount > 9999) throw new IllegalArgumentException("Invalid goods count");
+                    p.goods.put(entry.getKey(),amount);
+                }
+                if (root.has("xpWindows")) for (var e : root.getAsJsonObject("xpWindows").entrySet()) p.xpWindows.put(e.getKey(),e.getValue().getAsLong());
+                if (root.has("xpWindowAwards")) for (var e : root.getAsJsonObject("xpWindowAwards").entrySet()) p.xpWindowAwards.put(e.getKey(),e.getValue().getAsInt());
+                // Node bonuses affect capacity, so clamp only after graph state is loaded.
+                p.currentHp = Math.min(p.currentHp,p.maxHp());
+                p.currentPp = Math.min(p.currentPp,p.maxPp());
+            } else if (p.created) {
+                p.currentHp = p.maxHp(); p.currentPp = p.maxPp(); p.introSeen = true;
+            }
             return p;
         } catch (RuntimeException e) {
             // Never silently reset or overwrite unreadable/future data.
