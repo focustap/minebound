@@ -1,495 +1,261 @@
 package com.focustap.minebound;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
+import com.focustap.minebound.rpg.*;
+import java.io.IOException;
 import org.lwjgl.glfw.GLFW;
-
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 
-/**
- * Original retro-styled, menu-only local gameplay prototype.
- * Battles and skill allocations are NOT yet server-side/synchronized.
- */
-public final class MineboundScreen extends Screen {
-    private static final int INK = 0xFF171426;
-    private static final int PLUM = 0xFF2B2444;
-    private static final int LAVENDER = 0xFFCDBDE9;
-    private static final int CREAM = 0xFFF3E9D2;
-    private static final int GOLD = 0xFFE8B86C;
-    private static final int FERN = 0xFF6EA484;
-    private static final int RED = 0xFFE87A87;
-
-    private static final String[] ENEMIES = {
-        "MOSS SPRITE", "BRIARLING", "THORN KNIGHT", "MIRE ORACLE", "CROWNROOT"
-    };
-    private static final int[] ENEMY_HEALTH = {28, 38, 54, 78, 102};
-    private static final int ARENA_WIDTH = 236;
-    private static final int ARENA_HEIGHT = 90;
-    private static final int PHASE_LENGTH = 160;
-    private static final int HIT_INVULNERABILITY_TICKS = 12;
-
-    private enum View { MAP, SKILLS, BATTLE, DODGE, RESULTS }
+/** Menu/controller only. Character rules, persistence and combat live in separate systems. */
+public final class MineboundScreen extends RetroScreen {
+    private enum View { MAP, SHEET, DETAILS, SKILLS, BATTLE, ABILITIES, DODGE, RESULTS }
+    private final ProfileStore store;
+    private final CharacterProfile profile;
     private View view = View.MAP;
-    private final ClientProfile profile = ClientProfile.DEMO;
-    private final List<Bullet> bullets = new ArrayList<>();
-
-    private int stage = 0;
-    private int enemyHp;
-    private int hp = 134;
-    private int pp = 36;
-    private int turn = 1;
-    private int phaseTicks = 0;
-    private int iframe = 0;
-    private boolean defending;
-    private boolean won;
-    private boolean up, down, left, right;
-    private float heartX = ARENA_WIDTH / 2f;
-    private float heartY = ARENA_HEIGHT * 0.75f;
+    private CharacterClass selectedPath = CharacterClass.WARRIOR;
+    private Battle battle;
+    private boolean up, down, left, right, focus;
     private String status = "Choose an unlocked stage.";
+    private int animation;
 
-    private record Bullet(float x, float y, float vx, float vy, int radius, int color) {
-        Bullet advance() { return new Bullet(x + vx, y + vy, vx, vy, radius, color); }
+    public MineboundScreen(ProfileStore store, CharacterProfile profile) {
+        super("Minebound"); this.store = store; this.profile = profile;
     }
-
-    public MineboundScreen() {
-        super(Component.literal("Minebound"));
+    @Override protected void init() {
+        if (!profile.created) { minecraft.setScreen(new CharacterCreationScreen(store, profile)); return; }
+        rebuild();
     }
-
-    private int leftEdge() { return (width - 300) / 2; }
-    private int topEdge() { return (height - 204) / 2; }
-
-    @Override
-    protected void init() {
-        rebuildButtons();
+    private void navigate(View next) {
+        view = next; up = down = left = right = focus = false; rebuild();
     }
-
-    private void add(String label, int x, int y, int w, int h, Runnable action) {
-        addRenderableWidget(Button.builder(Component.literal(label), button -> action.run())
-                .bounds(x, y, w, h).build());
-    }
-
-    private void rebuildButtons() {
+    private void rebuild() {
         clearWidgets();
-        int x = leftEdge(), y = topEdge();
         switch (view) {
             case MAP -> {
                 for (int i = 0; i < 5; i++) {
-                    final int target = i;
-                    add("1-" + (i + 1), x + 8 + i * 57, y + 71, 52, 24,
-                            () -> startStage(target));
+                    final int stage = i;
+                    button("1-" + (i + 1), 12 + i * 58, 76, 53, () -> {
+                        battle = new Battle(profile, stage); navigate(View.BATTLE);
+                    }).active = profile.unlocked(stage);
                 }
-                add("SKILL TREE", x + 9, y + 154, 135, 22, () -> navigate(View.SKILLS));
-                add("EXIT", x + 156, y + 154, 135, 22, this::onClose);
+                button("CHARACTER", 12, 152, 138, () -> navigate(View.SHEET));
+                button("SKILL WEB", 160, 152, 138, () -> navigate(View.SKILLS));
+                button("EXIT", 105, 184, 100, this::onClose);
+            }
+            case SHEET -> {
+                for (Attribute a : Attribute.values()) {
+                    int col = a.ordinal() % 3, row = a.ordinal() / 3;
+                    var increase = button("+", 78 + col * 96, 112 + row * 25, 22, () -> {
+                        if (profile.spendAttribute(a)) save(); rebuild();
+                    });
+                    increase.active = profile.attributePoints > 0 && profile.attributes[a.ordinal()] < 18;
+                    increase.setTooltip(Tooltip.create(Component.literal(a.description)));
+                }
+                button("BONUSES", 12, 199, 90, () -> navigate(View.DETAILS));
+                button("SKILL WEB", 110, 199, 90, () -> navigate(View.SKILLS));
+                button("MAP", 208, 199, 90, () -> navigate(View.MAP));
+            }
+            case DETAILS -> {
+                button("ATTRIBUTES", 12, 199, 138, () -> navigate(View.SHEET));
+                button("WORLD MAP", 160, 199, 138, () -> navigate(View.MAP));
             }
             case SKILLS -> {
-                add("+ ROGUE", x + 10, y + 115, 135, 22, () -> spendSkill(true));
-                add("+ MAGE", x + 155, y + 115, 135, 22, () -> spendSkill(false));
-                add("BACK TO MAP", x + 68, y + 160, 164, 20, () -> navigate(View.MAP));
+                for (CharacterClass path : CharacterClass.values()) {
+                    button(path.label.substring(0, 3).toUpperCase() + " " + profile.rank(path), 12 + path.ordinal() * 58,
+                            58, 53, () -> { selectedPath = path; rebuild(); });
+                }
+                button("INVEST +1", 12, 173, 138, () -> {
+                    if (profile.spendSkill(selectedPath)) { save(); status = selectedPath.label + " path advanced."; }
+                    rebuild();
+                }).active = profile.skillPoints > 0 && profile.rank(selectedPath) < 3
+                        && (profile.rank(selectedPath) == 0 || java.util.Arrays.stream(profile.paths).sum() >= 2);
+                button("CHARACTER", 160, 173, 138, () -> navigate(View.SHEET));
+                button("WORLD MAP", 105, 199, 100, () -> navigate(View.MAP));
             }
             case BATTLE -> {
-                add("BASH", x + 14, y + 140, 86, 20, () -> attack(false));
-                add("ABILITY", x + 107, y + 140, 86, 20, () -> attack(true));
-                add("GOODS", x + 200, y + 140, 86, 20, () -> status = "No Minebound goods yet.");
-                add("DEFEND", x + 40, y + 166, 102, 20, this::defend);
-                add("RETREAT", x + 158, y + 166, 102, 20, this::retreat);
+                button("BASH", 12, 167, 90, () -> { battle.bash(); afterCommand(); });
+                button("ABILITY", 110, 167, 90, () -> navigate(View.ABILITIES));
+                button("DEFEND", 208, 167, 90, () -> { battle.defend(); afterCommand(); });
+                button("RETREAT", 105, 196, 100, () -> { battle.retreat(); status = "Retreated. No rewards."; navigate(View.MAP); });
             }
-            case RESULTS -> {
-                add("WORLD MAP", x + 75, y + 157, 150, 22, () -> navigate(View.MAP));
-            }
-            case DODGE -> { /* No buttons. Movement by arrow keys or WASD. */ }
-        }
-    }
-
-    private void navigate(View next) {
-        view = next;
-        rebuildButtons();
-    }
-
-    private void spendSkill(boolean rogue) {
-        boolean ok = rogue ? profile.spendRogue() : profile.spendMage();
-        status = ok ? (rogue ? "DEX increased. Rogue path advanced." :
-                "INT increased. Mage path advanced.") : "No skill points left.";
-    }
-
-    private void startStage(int target) {
-        if (target > profile.unlockedStage) {
-            status = "That stage is still locked.";
-            return;
-        }
-        stage = target;
-        hp = 134 + profile.con() * 6;
-        pp = 36;
-        enemyHp = ENEMY_HEALTH[stage];
-        defending = false;
-        turn = 1;
-        status = ENEMIES[stage] + " blocks your path!";
-        navigate(View.BATTLE);
-    }
-
-    private void attack(boolean ability) {
-        int damage;
-        if (ability) {
-            if (profile.mageAbility() && pp >= 7) {
-                damage = 16 + profile.intelligence() * 2;
-                pp -= 7;
-                status = "You cast SPARK for " + damage + " damage!";
-            } else if (profile.rogueAbility() && pp >= 5) {
-                damage = 14 + profile.dex() * 2;
-                pp -= 5;
-                status = "You use RIPOSTE for " + damage + " damage!";
-            } else {
-                status = "Unlock an active skill with 5 points in a path.";
-                return;
-            }
-        } else {
-            damage = 9 + profile.str() * 2;
-            status = "BASH hits for " + damage + " damage!";
-        }
-        enemyHp = Math.max(0, enemyHp - damage);
-        if (enemyHp == 0) {
-            finish(true);
-        } else {
-            beginDodge();
-        }
-    }
-
-    private void defend() {
-        defending = true;
-        status = "You brace for the next attack!";
-        beginDodge();
-    }
-
-    private void retreat() {
-        status = "You retreated from stage 1-" + (stage + 1) + ".";
-        navigate(View.MAP);
-    }
-
-    private void beginDodge() {
-        bullets.clear();
-        phaseTicks = 0;
-        iframe = 0;
-        heartX = ARENA_WIDTH / 2f;
-        heartY = ARENA_HEIGHT * 0.75f;
-        navigate(View.DODGE);
-    }
-
-    private void finish(boolean victory) {
-        won = victory;
-        if (victory) {
-            profile.unlockedStage = Math.max(profile.unlockedStage, Math.min(stage + 1, 4));
-            status = "Stage 1-" + (stage + 1) + " cleared!";
-        } else {
-            status = "Your party was defeated. Try again.";
-        }
-        navigate(View.RESULTS);
-    }
-
-    private void launch(float x, float y, float vx, float vy, int radius, int color) {
-        bullets.add(new Bullet(x, y, vx, vy, radius, color));
-    }
-
-    /** Fires toward the heart's position at launch, not where it moves afterward. */
-    private void launchAimed(float x, float y, float speed, int color) {
-        float dx = heartX - x;
-        float dy = heartY - y;
-        float length = (float) Math.sqrt(dx * dx + dy * dy);
-        if (length > 0.001f) {
-            launch(x, y, dx / length * speed, dy / length * speed, 3, color);
-        }
-    }
-
-    /** Distinct, learnable bullet patterns spanning the FULL arena, even at stage 1. */
-    private void spawnDodgePattern() {
-        // Staggered falling pairs: use a volley counter and a coprime stride.
-        // The old phaseTicks multiplier made Briarling advance only 2px per
-        // volley, accidentally trapping all of its projectiles on the left.
-        int rainGap = Math.max(7, 12 - stage);
-        if (phaseTicks % rainGap == 0) {
-            int volley = phaseTicks / rainGap;
-            float x = 8 + (volley * 67 + stage * 29) % (ARENA_WIDTH - 16);
-            float speed = 2.9f + stage * 0.23f;
-            launch(x, -6, 0, speed, 3, RED);
-            if (stage > 0 || volley % 2 == 0) {
-                launch(ARENA_WIDTH - x, -12, 0, speed + 0.2f, 3, RED);
-            }
-        }
-
-        // Gold projectiles home in on the heart's location when fired.
-        // Moving after they launch is always a valid way to dodge them.
-        int aimedGap = Math.max(15, 25 - stage * 2);
-        if (phaseTicks % aimedGap == 0) {
-            int volley = phaseTicks / aimedGap;
-            float x = 12 + (volley * 89 + stage * 43) % (ARENA_WIDTH - 24);
-            launchAimed(x, -8, 3.25f + stage * 0.18f, GOLD);
-        }
-
-        // Crossfire forces movement vertically, instead of allowing players
-        // to camp between the vertical rain lanes. Alternate both entrances.
-        int sideGap = Math.max(12, 25 - stage * 3);
-        if (phaseTicks % sideGap == 0) {
-            int volley = phaseTicks / sideGap;
-            float lane = 10 + (volley * 29 + stage * 9) % (ARENA_HEIGHT - 20);
-            boolean fromLeft = volley % 2 == 0;
-            float horizontalSpeed = 3.6f + stage * 0.25f;
-            launch(fromLeft ? -7 : ARENA_WIDTH + 7, lane,
-                    fromLeft ? horizontalSpeed : -horizontalSpeed, 0, 3, FERN);
-            if (stage >= 2) {
-                launch(fromLeft ? ARENA_WIDTH + 7 : -7, ARENA_HEIGHT - lane,
-                        fromLeft ? -horizontalSpeed : horizontalSpeed, 0, 3, FERN);
-            }
-        }
-
-        // Briarling onward: occasional thorns aimed from either side.
-        if (stage >= 1 && phaseTicks % Math.max(20, 37 - stage * 3) == 0) {
-            int volley = phaseTicks / Math.max(20, 37 - stage * 3);
-            boolean fromLeft = volley % 2 == 0;
-            float y = 9 + (volley * 23 + stage * 13) % (ARENA_HEIGHT - 18);
-            launchAimed(fromLeft ? -8 : ARENA_WIDTH + 8, y,
-                    3.8f + stage * 0.2f, GOLD);
-        }
-    }
-
-    @Override
-    public void tick() {
-        super.tick();
-        if (view != View.DODGE) return;
-
-        float velocity = 2.2f + profile.roguePassives * 0.05f;
-        float moveX = (right ? 1 : 0) - (left ? 1 : 0);
-        float moveY = (down ? 1 : 0) - (up ? 1 : 0);
-        if (moveX != 0 && moveY != 0) {
-            moveX *= 0.70710677f;
-            moveY *= 0.70710677f;
-        }
-        heartX = Mth.clamp(heartX + moveX * velocity, 6, ARENA_WIDTH - 6);
-        heartY = Mth.clamp(heartY + moveY * velocity, 6, ARENA_HEIGHT - 6);
-
-        phaseTicks++;
-        if (iframe > 0) iframe--;
-        spawnDodgePattern();
-
-        List<Bullet> next = new ArrayList<>();
-        for (Bullet b : bullets) {
-            Bullet moved = b.advance();
-            if (moved.x < -12 || moved.x > ARENA_WIDTH + 12
-                    || moved.y < -16 || moved.y > ARENA_HEIGHT + 12) continue;
-            next.add(moved);
-            float collisionRadius = moved.radius + 4f;
-            if (iframe == 0 && Math.abs(moved.x - heartX) < collisionRadius
-                    && Math.abs(moved.y - heartY) < collisionRadius) {
-                hp = Math.max(0, hp - (defending ? 3 : 8));
-                iframe = HIT_INVULNERABILITY_TICKS;
-                if (hp == 0) {
-                    finish(false);
-                    return;
+            case ABILITIES -> {
+                var abilities = profile.abilities();
+                for (int i = 0; i < abilities.size(); i++) {
+                    Ability a = abilities.get(i);
+                    var ability = button(a.label() + " " + profile.cost(a) + " PP", 12, 46 + i * 23, 141, () -> {
+                        battle.ability(a); afterCommand();
+                    });
+                    ability.active = battle.pp >= profile.cost(a);
+                    ability.setTooltip(Tooltip.create(Component.literal(a.description + " Scales with " + a.scaling + ".")));
                 }
+                button("BACK", 105, 199, 100, () -> navigate(View.BATTLE));
+            }
+            case RESULTS -> button("WORLD MAP", 80, 192, 150, () -> navigate(View.MAP));
+            case DODGE -> { }
+        }
+    }
+    private boolean save() {
+        try { store.save(profile); return true; }
+        catch (IOException e) { status = "Save failed. Check folder permissions."; return false; }
+    }
+    @Override public void removed() {
+        // Retry failed writes on exit; the last valid file is retained as .bak.
+        if (profile.created) save();
+        super.removed();
+    }
+    private void afterCommand() {
+        if (battle.state == Battle.State.WON) {
+            int award = profile.victory(battle.stage);
+            status = award == 0 ? "Practice clear. Already claimed rewards." : "+" + award + " XP! Level " + profile.level() + ".";
+            save(); navigate(View.RESULTS);
+        } else if (battle.state == Battle.State.DODGE) navigate(View.DODGE);
+        else navigate(View.BATTLE);
+    }
+    @Override public void tick() {
+        super.tick(); animation++;
+        if (view != View.DODGE) return;
+        battle.update((right ? 1 : 0) - (left ? 1 : 0), (down ? 1 : 0) - (up ? 1 : 0), focus);
+        if (battle.state == Battle.State.LOST) { status = "Defeated. Adjust your build or try again."; navigate(View.RESULTS); }
+        else if (battle.state == Battle.State.COMMAND) navigate(View.BATTLE);
+    }
+    @Override void drawPage(GuiGraphics g) {
+        switch (view) {
+            case MAP -> drawMap(g);
+            case SHEET -> drawSheet(g);
+            case DETAILS -> drawDetails(g);
+            case SKILLS -> drawSkills(g);
+            case BATTLE -> drawBattle(g);
+            case ABILITIES -> drawAbilities(g);
+            case DODGE -> drawDodge(g);
+            case RESULTS -> {
+                text(g, battle.state == Battle.State.WON ? "VICTORY!" : "DEFEAT", 120, 60, battle.state == Battle.State.WON ? FERN : RED);
+                wrap(g, status, 18, 93, 274, CREAM);
+                text(g, "Level " + profile.level() + " / " + profile.xp + " XP", 18, 128, GOLD);
+                text(g, "Attributes: " + profile.attributePoints + " / Skills: " + profile.skillPoints, 18, 145, LAVENDER);
             }
         }
-        bullets.clear();
-        bullets.addAll(next);
-
-        if (phaseTicks >= PHASE_LENGTH) {
-            defending = false;
-            turn++;
-            status = "You survived the attack. Choose a command.";
-            navigate(View.BATTLE);
+    }
+    private void drawMap(GuiGraphics g) {
+        text(g, "WORLD 1: WHISPERING WOODS", 12, 31, CREAM);
+        text(g, profile.name + " / Lv " + profile.level() + " " + profile.startingClass.label, 12, 49, LAVENDER);
+        for (int i = 0; i < 5; i++) {
+            int color = (profile.clearedMask & (1 << i)) != 0 ? FERN : profile.unlocked(i) ? GOLD : PLUM;
+            g.fill(x() + 28 + i * 58, y() + 103, x() + 40 + i * 58, y() + 113, color);
         }
+        text(g, "1-3 MINIBOSS       1-5 WORLD BOSS", 12, 128, GOLD);
+        wrap(g, status, 12, 211, 285, LAVENDER);
     }
-
-    private static boolean directionKey(int code) {
-        return code == GLFW.GLFW_KEY_UP || code == GLFW.GLFW_KEY_DOWN
-                || code == GLFW.GLFW_KEY_LEFT || code == GLFW.GLFW_KEY_RIGHT
-                || code == GLFW.GLFW_KEY_W || code == GLFW.GLFW_KEY_A
-                || code == GLFW.GLFW_KEY_S || code == GLFW.GLFW_KEY_D;
+    private void drawSheet(GuiGraphics g) {
+        text(g, profile.name + " / " + profile.race.label + " " + profile.startingClass.label, 12, 30, CREAM);
+        text(g, "LEVEL " + profile.level() + "  XP " + profile.xp + "/" + CharacterProfile.threshold(profile.level() + 1), 12, 45, GOLD);
+        int hp = battle == null ? profile.maxHp() : battle.hp;
+        int pp = battle == null ? profile.maxPp() : battle.pp;
+        text(g, "HP " + hp + "/" + profile.maxHp() + "  PP " + pp + "/" + profile.maxPp(), 12, 60, CREAM);
+        text(g, "Points: " + profile.attributePoints + " ATTR / " + profile.skillPoints + " SKILL", 12, 75, GOLD);
+        text(g, "BASH " + CombatRules.bash(profile, 1) + "  SPEED " + String.format(java.util.Locale.ROOT, "%.2f", profile.speed())
+                + "  CLEARS " + Integer.bitCount(profile.clearedMask) + "/5", 12, 92, FERN);
+        for (Attribute a : Attribute.values()) text(g, a + " " + profile.stat(a), 12 + a.ordinal() % 3 * 96, 118 + a.ordinal() / 3 * 25, CREAM);
+        wrap(g, profile.race.passive, 12, 164, 284, LAVENDER);
+        // Full ability effects and class/path bonuses are inspectable in the skill web.
     }
-
-    private void setDirection(int key, boolean pressed) {
-        if (key == GLFW.GLFW_KEY_W || key == GLFW.GLFW_KEY_UP) up = pressed;
-        if (key == GLFW.GLFW_KEY_S || key == GLFW.GLFW_KEY_DOWN) down = pressed;
-        if (key == GLFW.GLFW_KEY_A || key == GLFW.GLFW_KEY_LEFT) left = pressed;
-        if (key == GLFW.GLFW_KEY_D || key == GLFW.GLFW_KEY_RIGHT) right = pressed;
+    private void drawSkills(GuiGraphics g) {
+        text(g, "MULTICLASS WEB / POINTS " + profile.skillPoints, 12, 30, GOLD);
+        text(g, "COMMON ROOT ---- EVERY PATH IS OPEN", 12, 45, FERN);
+        CharacterClass c = selectedPath;
+        text(g, c.label + "  Rank " + profile.rank(c) + "/3", 12, 85, CREAM);
+        String bonus = switch(c) {
+            case WARRIOR -> "+1 BASH damage per rank";
+            case ROGUE -> "+0.05 heart speed per rank";
+            case WIZARD -> "+1 max PP per rank";
+            case DRUID -> "+1 restorative healing per rank";
+            case PALADIN -> "+1 max HP per rank";
+        };
+        text(g, bonus, 12, 100, FERN);
+        wrap(g, "Rank 2: learn " + c.ability + (c == CharacterClass.DRUID ? " + MEND" : "")
+                + ". Rank 2 needs two points anywhere in the web. Rank 3 improves scaling.", 12, 115, 284, LAVENDER);
+        wrap(g, "Starting passive: " + profile.startingClass.passive, 12, 147, 284, GOLD);
     }
-
-    @Override
-    public boolean keyPressed(int key, int scan, int modifiers) {
-        if (view == View.DODGE && directionKey(key)) {
-            setDirection(key, true);
-            return true;
+    private void drawDetails(GuiGraphics g) {
+        text(g, "CHARACTER / ACTIVE & PASSIVE BONUSES", 12, 30, GOLD);
+        wrap(g, profile.startingClass.passive, 12, 47, 284, FERN);
+        wrap(g, profile.race.passive, 12, 73, 284, LAVENDER);
+        text(g, "UNLOCKED ABILITIES: DAMAGE / HEAL / PP", 12, 104, CREAM);
+        int row = 120;
+        for (Ability a : profile.abilities()) {
+            text(g, a.label(), 12, row, GOLD);
+            text(g, CombatRules.abilityDamage(profile, a) + " / " + CombatRules.healing(profile, a)
+                    + " / " + profile.cost(a), 181, row, FERN);
+            row += 12;
         }
+        // Aggregate path ranks are applied in the derived values; inspect individual paths in the web.
+        text(g, "W " + profile.paths[0] + " / R " + profile.paths[1] + " / M " + profile.paths[2]
+                + " / D " + profile.paths[3] + " / P " + profile.paths[4], 12, 189, LAVENDER);
+    }
+    private void drawBattle(GuiGraphics g) {
+        text(g, battle.enemy.name() + " / TURN " + battle.turn, 12, 30, CREAM);
+        text(g, "FOE " + battle.enemyHp + "/" + battle.enemy.hp() + "  PHASE " + battle.phase(), 12, 45, RED);
+        EnemySprites.draw(g, battle.enemy.id(), x() + 155, y() + 94, animation);
+        text(g, "HP " + battle.hp + "/" + profile.maxHp() + "   PP " + battle.pp + "/" + profile.maxPp(), 12, 127, CREAM);
+        wrap(g, battle.message, 12, 143, 285, GOLD);
+    }
+    private void drawAbilities(GuiGraphics g) {
+        text(g, "ABILITIES / PP " + battle.pp + "/" + profile.maxPp(), 12, 30, GOLD);
+        int i = 0;
+        for (Ability a : profile.abilities()) {
+            text(g, CombatRules.abilityDamage(profile, a) + " DMG / " + CombatRules.healing(profile, a) + " HP", 164, 51 + i * 23, FERN);
+            i++;
+        }
+        text(g, "Hover an ability to inspect its effect.", 12, 187, LAVENDER);
+    }
+    private void drawDodge(GuiGraphics g) {
+        text(g, battle.enemy.name() + " / PHASE " + battle.phase(), 12, 30, CREAM);
+        text(g, "HP " + battle.hp + "   PP " + battle.pp, 203, 30, GOLD);
+        int ax = x() + 37, ay = y() + 59;
+        g.fill(ax - 3, ay - 3, ax + Patterns.WIDTH + 3, ay + Patterns.HEIGHT + 3, CREAM);
+        g.fill(ax, ay, ax + Patterns.WIDTH, ay + Patterns.HEIGHT, INK);
+        for (Projectile p : battle.bullets) {
+            int bx = ax + Math.round(p.x), by = ay + Math.round(p.y), r = Math.round(p.radius);
+            // Clip edge telegraphs to the arena border, so warnings remain visible.
+            bx = Math.clamp(bx, ax, ax + Patterns.WIDTH); by = Math.clamp(by, ay, ay + Patterns.HEIGHT);
+            int color = p.delay > 0 ? 0xFF706380 : p.color;
+            if (p.delay > 0) {
+                g.renderOutline(bx - r - 1, by - r - 1, r * 2 + 2, r * 2 + 2, color);
+            } else g.fill(bx - r, by - r, bx + r, by + r, color);
+        }
+        if (battle.iframe % 4 < 2) {
+            int hx = ax + Math.round(battle.heartX), hy = ay + Math.round(battle.heartY);
+            g.fill(hx - 4, hy - 3, hx - 1, hy + 2, RED);
+            g.fill(hx + 1, hy - 3, hx + 4, hy + 2, RED);
+            g.fill(hx - 3, hy, hx + 3, hy + 4, RED);
+            g.fill(hx - 1, hy + 3, hx + 1, hy + 6, RED);
+        }
+        text(g, Patterns.name(battle.stage, battle.turn, battle.phase(), battle.tick), 12, 181, GOLD);
+        text(g, "WASD / ARROWS   SHIFT: precision", 12, 198, LAVENDER);
+        text(g, "Hollow = warning / " + ((Patterns.LENGTH - battle.tick + 19) / 20) + " seconds left", 12, 213, LAVENDER);
+    }
+    private boolean direction(int key, boolean pressed) {
+        switch (key) {
+            case GLFW.GLFW_KEY_W, GLFW.GLFW_KEY_UP -> up = pressed;
+            case GLFW.GLFW_KEY_S, GLFW.GLFW_KEY_DOWN -> down = pressed;
+            case GLFW.GLFW_KEY_A, GLFW.GLFW_KEY_LEFT -> left = pressed;
+            case GLFW.GLFW_KEY_D, GLFW.GLFW_KEY_RIGHT -> right = pressed;
+            case GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_KEY_RIGHT_SHIFT -> focus = pressed;
+            default -> { return false; }
+        }
+        return true;
+    }
+    @Override public boolean keyPressed(int key, int scan, int modifiers) {
+        if (view == View.DODGE && direction(key, true)) return true;
         return super.keyPressed(key, scan, modifiers);
     }
-
-    @Override
-    public boolean keyReleased(int key, int scan, int modifiers) {
-        if (directionKey(key)) {
-            setDirection(key, false);
-            return view == View.DODGE || super.keyReleased(key, scan, modifiers);
-        }
-        return super.keyReleased(key, scan, modifiers);
+    @Override public boolean keyReleased(int key, int scan, int modifiers) {
+        boolean handled = direction(key, false);
+        return handled || super.keyReleased(key, scan, modifiers);
     }
-
-    private void panel(GuiGraphics gfx, int x, int y, int w, int h) {
-        gfx.fill(x, y, x + w, y + h, CREAM);
-        gfx.fill(x + 3, y + 3, x + w - 3, y + h - 3, PLUM);
-        gfx.fill(x + 6, y + 6, x + w - 6, y + h - 6, INK);
-    }
-
-    private void label(GuiGraphics gfx, String value, int x, int y, int color) {
-        gfx.drawString(font, value, x, y, color, false);
-    }
-
-    /**
-     * Minecraft 1.21.1 Screen.render() invokes renderBackground() before it draws
-     * interactive widgets. Draw the entire opaque Minebound canvas here instead
-     * of drawing it before super.render(): the latter triggers Minecraft's
-     * background blur AFTER our art/text, smearing every custom element while
-     * the vanilla buttons remain sharp.
-     *
-     * Intentionally do not call super.renderBackground(): our fully opaque
-     * background requires no world blur or vanilla menu backdrop.
-     */
-    @Override
-    public void renderBackground(GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
-        gfx.fill(0, 0, width, height, INK);
-        int x = leftEdge(), y = topEdge();
-        panel(gfx, x, y, 300, 204);
-        label(gfx, "MINEBOUND", x + 12, y + 10, GOLD);
-
-        switch (view) {
-            case MAP -> renderMap(gfx, x, y);
-            case SKILLS -> renderSkills(gfx, x, y);
-            case BATTLE -> renderBattle(gfx, x, y);
-            case DODGE -> renderDodge(gfx, x, y);
-            case RESULTS -> {
-                gfx.drawCenteredString(font, won ? "VICTORY!" : "DEFEAT", x + 150, y + 78, won ? FERN : RED);
-                gfx.drawCenteredString(font, status, x + 150, y + 106, CREAM);
-            }
-        }
-        if (view == View.MAP || view == View.SKILLS) {
-            gfx.drawCenteredString(font, status, x + 150, y + 188, LAVENDER);
-        }
-        // Inherited Screen.render() draws the buttons AFTER this method.
-    }
-
-    private void renderMap(GuiGraphics gfx, int x, int y) {
-        label(gfx, "WORLD 1: WHISPERING WOODS", x + 12, y + 29, CREAM);
-        label(gfx, "Select a stage to enter combat.", x + 12, y + 43, LAVENDER);
-        gfx.fill(x + 26, y + 101, x + 272, y + 104, GOLD);
-        for (int i = 0; i < 5; i++) {
-            int color = i < profile.unlockedStage ? FERN :
-                    i == profile.unlockedStage ? GOLD : 0xFF656074;
-            gfx.fill(x + 24 + i * 57, y + 99, x + 35 + i * 57, y + 109, color);
-        }
-        label(gfx, "1-3 MINI BOSS", x + 21, y + 122, LAVENDER);
-        label(gfx, "1-5 CASTLE BOSS", x + 166, y + 122, LAVENDER);
-    }
-
-    private void renderSkills(GuiGraphics gfx, int x, int y) {
-        label(gfx, "FREE MULTICLASS SKILL WEB", x + 12, y + 30, CREAM);
-        label(gfx, "POINTS: " + profile.skillPoints, x + 12, y + 45, GOLD);
-        label(gfx, "STR " + profile.str() + "  DEX " + profile.dex() +
-                "  CON " + profile.con(), x + 12, y + 62, CREAM);
-        label(gfx, "INT " + profile.intelligence() + "  WIS " + profile.wis() +
-                "  CHA " + profile.cha(), x + 12, y + 78, CREAM);
-        label(gfx, "ROGUE " + profile.roguePassives + "/5", x + 14, y + 103, FERN);
-        label(gfx, "MAGE " + profile.magePassives + "/5", x + 161, y + 103, LAVENDER);
-        label(gfx, "5 passives unlock RIPOSTE / SPARK.", x + 12, y + 149, GOLD);
-    }
-
-    private void renderBattle(GuiGraphics gfx, int x, int y) {
-        label(gfx, "TURN " + turn + "   " + ENEMIES[stage], x + 12, y + 31, CREAM);
-        label(gfx, "Enemy HP: " + enemyHp, x + 12, y + 45, RED);
-        gfx.fill(x + 10, y + 59, x + 290, y + 107, PLUM);
-        drawEnemyPortrait(gfx, x + 150, y + 83);
-        label(gfx, "YOU", x + 13, y + 112, LAVENDER);
-        label(gfx, "HP " + hp + "    PP " + pp, x + 58, y + 112, CREAM);
-        label(gfx, status, x + 12, y + 126, GOLD);
-    }
-
-    /**
-     * Tiny original pixel portraits built with crisp rectangles, avoiding external
-     * IP assets. These are temporary designs until full PNG sprites are produced.
-     */
-    private void drawEnemyPortrait(GuiGraphics gfx, int centerX, int centerY) {
-        int main = switch (stage) {
-            case 0 -> FERN;
-            case 1 -> 0xFF668B59;
-            case 2 -> 0xFF6EA484;
-            case 3 -> 0xFF8E77B6;
-            default -> 0xFF927455;
-        };
-        int eye = switch (stage) {
-            case 0 -> GOLD;
-            case 1 -> RED;
-            case 2 -> RED;
-            case 3 -> GOLD;
-            default -> 0xFFE9CC82;
-        };
-        // Shadow, body, crown/hood, and eyes.
-        gfx.fill(centerX - 21, centerY + 14, centerX + 21, centerY + 17, INK);
-        gfx.fill(centerX - 16, centerY - 10, centerX + 16, centerY + 11, main);
-        gfx.fill(centerX - 13, centerY - 13, centerX + 13, centerY - 8, main);
-        gfx.fill(centerX - 10, centerY + 10, centerX + 10, centerY + 15, main);
-        gfx.fill(centerX - 11, centerY - 4, centerX - 4, centerY + 1, INK);
-        gfx.fill(centerX + 4, centerY - 4, centerX + 11, centerY + 1, INK);
-        gfx.fill(centerX - 9, centerY - 3, centerX - 5, centerY, eye);
-        gfx.fill(centerX + 5, centerY - 3, centerX + 9, centerY, eye);
-        gfx.fill(centerX - 4, centerY + 5, centerX + 4, centerY + 7, INK);
-        if (stage == 2) { // The Thorn Knight's distinct gold antlers.
-            gfx.fill(centerX - 19, centerY - 17, centerX - 13, centerY - 9, GOLD);
-            gfx.fill(centerX + 13, centerY - 17, centerX + 19, centerY - 9, GOLD);
-            gfx.fill(centerX - 8, centerY - 20, centerX + 8, centerY - 15, GOLD);
-        } else if (stage == 4) { // Crownroot's sprawling branch crown.
-            gfx.fill(centerX - 24, centerY - 21, centerX + 24, centerY - 15, FERN);
-            gfx.fill(centerX - 19, centerY - 26, centerX - 9, centerY - 12, FERN);
-            gfx.fill(centerX + 9, centerY - 26, centerX + 19, centerY - 12, FERN);
-        } else if (stage == 3) {
-            gfx.fill(centerX - 8, centerY - 18, centerX + 8, centerY - 11, LAVENDER);
-            gfx.fill(centerX - 3, centerY - 22, centerX + 3, centerY - 18, GOLD);
-        } else if (stage == 1) {
-            gfx.fill(centerX - 19, centerY + 4, centerX - 14, centerY + 16, RED);
-            gfx.fill(centerX + 14, centerY + 4, centerX + 19, centerY + 16, RED);
-        } else {
-            gfx.fill(centerX - 8, centerY - 17, centerX - 2, centerY - 11, GOLD);
-            gfx.fill(centerX + 2, centerY - 17, centerX + 8, centerY - 11, GOLD);
-        }
-    }
-
-    private void renderDodge(GuiGraphics gfx, int x, int y) {
-        label(gfx, ENEMIES[stage] + " ATTACKS!", x + 12, y + 29, CREAM);
-        label(gfx, "HP " + hp + " / PP " + pp, x + 190, y + 29, GOLD);
-        int arenaX = x + 32, arenaY = y + 52;
-        gfx.fill(arenaX - 3, arenaY - 3, arenaX + ARENA_WIDTH + 3,
-                arenaY + ARENA_HEIGHT + 3, CREAM);
-        gfx.fill(arenaX, arenaY, arenaX + ARENA_WIDTH,
-                arenaY + ARENA_HEIGHT, INK);
-        for (Bullet bullet : bullets) {
-            int bx = arenaX + Math.round(bullet.x), by = arenaY + Math.round(bullet.y);
-            gfx.fill(bx - bullet.radius, by - bullet.radius,
-                    bx + bullet.radius, by + bullet.radius, bullet.color);
-        }
-        if (iframe % 4 < 2) {
-            int hx = arenaX + Math.round(heartX), hy = arenaY + Math.round(heartY);
-            // Hand-drawn, original tiny pixel heart.
-            gfx.fill(hx - 5, hy - 3, hx - 1, hy + 1, RED);
-            gfx.fill(hx + 1, hy - 3, hx + 5, hy + 1, RED);
-            gfx.fill(hx - 5, hy, hx + 5, hy + 3, RED);
-            gfx.fill(hx - 3, hy + 3, hx + 3, hy + 5, RED);
-            gfx.fill(hx - 1, hy + 5, hx + 1, hy + 7, RED);
-        }
-        gfx.drawCenteredString(font, "DODGE WITH WASD / ARROWS", x + 150, y + 164, GOLD);
-        gfx.drawCenteredString(font, "Time remaining: " +
-                ((PHASE_LENGTH - phaseTicks + 19) / 20) + "s", x + 150, y + 179, LAVENDER);
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
+    @Override public void onClose() {
+        // Closing during combat is a retreat. Rewards only come from a completed victory.
+        if (battle != null && (view == View.DODGE || view == View.BATTLE || view == View.ABILITIES)) battle.retreat();
+        super.onClose();
     }
 }

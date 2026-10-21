@@ -12,6 +12,20 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+repositories { mavenCentral() }
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'com.google.code.gson:gson:2.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+test {
+    useJUnitPlatform()
+    systemProperty 'junit.jupiter.execution.timeout.default', '15 s'
+}
+
+apply from: 'gradle/enemy-sprites.gradle'
+
 neoForge {
     version = project.neo_version
     parchment {

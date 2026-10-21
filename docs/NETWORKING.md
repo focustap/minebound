@@ -1,6 +1,6 @@
 # Authoritative multiplayer architecture (planned)
 
-The initial build is a **client-side gameplay mock/prototype** to vet controls and visual feel. It is not a secure or synchronized multiplayer simulation.
+Version 0.2 implements persistent **local single-player** gameplay. It is not a secure or synchronized multiplayer simulation. The `rpg` package separates the simulation from Minecraft rendering and input; the server can own these rules later. Current JSON saves are client-local and must not be trusted by a future server.
 
 ## Target model
 - Server owns party membership, invitations, unanimous ready state, stage unlocks, player attributes, skill points, Minebound inventory, HP/PP, enemy AI, timers, projectile seeds and all damage.
@@ -12,7 +12,7 @@ The initial build is a **client-side gameplay mock/prototype** to vet controls a
 - Validate input rate and movement speed. Use conservative lag compensation and keep encounters beatable despite network jitter.
 
 ## Milestones
-1. Persistent server-side player data (per-UUID), first altar grant and skill validation.
+1. Move local profiles to persistent server-side player data (per-UUID), validate creation/skill intents, and define explicit import policy for client saves.
 2. Custom NeoForge payloads and server/clients sync.
 3. Party invitations + ready up; leader-controlled stage selection.
 4. Server turn phases with timeouts so party members cannot hold the game forever.
