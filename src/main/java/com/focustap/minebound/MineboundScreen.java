@@ -281,8 +281,18 @@ public final class MineboundScreen extends Screen {
         gfx.drawString(font, value, x, y, color, false);
     }
 
+    /**
+     * Minecraft 1.21.1 Screen.render() invokes renderBackground() before it draws
+     * interactive widgets. Draw the entire opaque Minebound canvas here instead
+     * of drawing it before super.render(): the latter triggers Minecraft's
+     * background blur AFTER our art/text, smearing every custom element while
+     * the vanilla buttons remain sharp.
+     *
+     * Intentionally do not call super.renderBackground(): our fully opaque
+     * background requires no world blur or vanilla menu backdrop.
+     */
     @Override
-    public void render(GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
+    public void renderBackground(GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
         gfx.fill(0, 0, width, height, INK);
         int x = leftEdge(), y = topEdge();
         panel(gfx, x, y, 300, 204);
@@ -301,7 +311,7 @@ public final class MineboundScreen extends Screen {
         if (view == View.MAP || view == View.SKILLS) {
             gfx.drawCenteredString(font, status, x + 150, y + 188, LAVENDER);
         }
-        super.render(gfx, mouseX, mouseY, partialTick);
+        // Inherited Screen.render() draws the buttons AFTER this method.
     }
 
     private void renderMap(GuiGraphics gfx, int x, int y) {
