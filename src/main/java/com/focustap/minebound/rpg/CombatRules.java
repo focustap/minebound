@@ -16,7 +16,7 @@ public final class CombatRules {
         if (a == Ability.WARD || a == Ability.MEND || a == Ability.BARRIER || a == Ability.BULWARK
                 || a == Ability.REJUVENATE || a == Ability.MEDITATE) return 0;
         if (a == Ability.CANTRIP) return Math.max(3, 3 + p.modifier(Attribute.INT));
-        int damage = 11 + 2 * p.modifier(a.scaling) + p.rank(a.path);
+        int damage = 11 + 2 * p.modifier(a.scaling) + p.rank(a.path) + (SkillGraph.unlocks(p,a) ? 2 : 0);
         if (p.startingClass == CharacterClass.WIZARD && (a == Ability.SPARK || a == Ability.BRAMBLE)) damage += 2;
         if (a.scaling == Attribute.INT || a.scaling == Attribute.CHA || a.scaling == Attribute.WIS) damage += SkillGraph.bonus(p,"spell");
         if (a == Ability.ARCANE_MISSILES || a == Ability.EMBER_NOVA || a == Ability.RECKLESS_STRIKE) damage += 5;
@@ -25,7 +25,8 @@ public final class CombatRules {
     public static int healing(CharacterProfile p, Ability a) {
         int heal = switch (a) { case BRAMBLE -> 3; case WARD -> 5; case MEND -> 10; case DRAIN -> 6; default -> 0; };
         if (heal == 0) return 0;
-        heal += Math.max(0, p.modifier(a == Ability.DRAIN ? Attribute.CHA : Attribute.WIS)) + p.rank(CharacterClass.DRUID) + SkillGraph.bonus(p,"heal");
+        heal += Math.max(0, p.modifier(a == Ability.DRAIN ? Attribute.CHA : Attribute.WIS)) + p.rank(CharacterClass.DRUID) + SkillGraph.bonus(p,"heal")
+                + (SkillGraph.unlocks(p,a) ? 2 : 0);
         if (p.startingClass == CharacterClass.DRUID) heal += 2;
         return p.race == Race.UNDEAD ? Math.max(1, heal * 3 / 4) : heal;
     }

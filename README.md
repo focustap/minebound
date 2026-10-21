@@ -24,7 +24,7 @@ Shared four-heart parties, invitations/readiness and co-op encounter synchroniza
 .\gradlew.bat clean build
 ```
 
-On Linux/macOS use `./gradlew`. The normal build runs 29 JUnit tests and creates `build/libs/minebound-0.3.0.jar`. Install the same mod on server and clients.
+On Linux/macOS use `./gradlew`. The normal build runs 30 JUnit tests and creates `build/libs/minebound-0.3.0.jar`. Install the same mod on server and clients.
 
 Place/craft an Altar or find it in Creative Functional Blocks. Create a character, select a map landmark, then press ENTER. WASD/arrows move the heart; Shift enables precision movement. Drag/scroll the skill canvas, select a node, and confirm its purchase.
 

@@ -8,7 +8,7 @@ public final class SkillGraph {
     public record Node(String id, String label, String family, String branch, Kind kind,
                        String effect, int value, Ability ability, List<String> links, int cost, float x, float y, int color) {
         public String description() {
-            if (ability != null) return ability.description + " Scales with " + ability.scaling + ".";
+            if (ability != null) return ability.description + " Learn or master (+2 damage/healing/shield where applicable). Scales with " + ability.scaling + ".";
             return switch (effect) {
                 case "bash" -> "+" + value + " BASH damage.";
                 case "spell" -> "+" + value + " offensive spell damage.";

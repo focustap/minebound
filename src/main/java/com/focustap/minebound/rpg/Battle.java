@@ -53,7 +53,7 @@ public final class Battle {
         enemyHp = Math.max(0, enemyHp - damage);
         hp = Math.min(profile.maxHp(), hp + healing);
         guarding = a == Ability.WARD || a == Ability.BARRIER || a == Ability.BULWARK;
-        if (a == Ability.BARRIER || a == Ability.BULWARK || a == Ability.SMITE) shield += 3 + Math.max(0,profile.modifier(a.scaling));
+        if (a == Ability.BARRIER || a == Ability.BULWARK || a == Ability.SMITE) shield += 3 + Math.max(0,profile.modifier(a.scaling)) + (SkillGraph.unlocks(profile,a) ? 2 : 0);
         quick = a == Ability.QUICK_CUT;
         boolean saved = enemySave(a);
         if (a == Ability.FIREBOLT && !saved) burnRounds = 3;

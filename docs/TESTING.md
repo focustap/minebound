@@ -6,7 +6,7 @@
 .\gradlew.bat clean build
 ```
 
-The normal build runs **29 JUnit tests**: creation and all race/class combinations, exhaustive legal creation resource ranges, first-clear XP/leveling, legacy data, current-resource reloads, one-time/rollback-safe recovery, duplicate activity awards and budgets, graph connectivity/hybrids, Wizard multi-encounter resource balance, Warlock sustain limits, net spell costs, reset aggregate reload, targeting/camping, boss phases/durability, collision and sprite gutters.
+The normal build runs **30 JUnit tests**: creation and all race/class combinations, exhaustive legal creation resource ranges, first-clear XP/leveling, legacy data, current-resource reloads, one-time/rollback-safe recovery, duplicate activity awards and budgets, graph connectivity/hybrids, Wizard multi-encounter resource balance, Warlock sustain limits, net spell costs, reset aggregate reload, targeting/camping, boss phases/durability, collision and sprite gutters.
 
 An opt-in **real Minecraft client/integrated-server scenario** creates its own throwaway world and operates the actual screens and network handlers:
 

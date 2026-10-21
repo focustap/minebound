@@ -121,4 +121,17 @@ class ExpansionRulesTest {
         assertEquals(1,p.cost(Ability.DRAIN)); assertTrue(b.ability(Ability.DRAIN));
         assertEquals(before-1,b.pp);
     }
+    @Test void activeNodesImproveAlreadyKnownStartingSkillsInsteadOfBecomingEmptyPurchases() {
+        CharacterProfile druid=CharacterRulesTest.character(Race.HUMAN,CharacterClass.DRUID);
+        int damage=CombatRules.abilityDamage(druid,Ability.BRAMBLE),heal=CombatRules.healing(druid,Ability.BRAMBLE);
+        druid.nodes.add("nature_6");
+        assertEquals(damage+2,CombatRules.abilityDamage(druid,Ability.BRAMBLE));
+        assertEquals(heal+2,CombatRules.healing(druid,Ability.BRAMBLE));
+        CharacterProfile paladin=CharacterRulesTest.character(Race.HUMAN,CharacterClass.PALADIN);
+        heal=CombatRules.healing(paladin,Ability.WARD); paladin.nodes.add("holy_defender_6");
+        assertEquals(heal+2,CombatRules.healing(paladin,Ability.WARD));
+        CharacterProfile warlock=CharacterRulesTest.character(Race.HUMAN,CharacterClass.WARLOCK);
+        damage=CombatRules.abilityDamage(warlock,Ability.PSYCHIC_BLADE); warlock.nodes.add("psychic_blade_6");
+        assertEquals(damage+2,CombatRules.abilityDamage(warlock,Ability.PSYCHIC_BLADE));
+    }
 }
