@@ -31,7 +31,8 @@ public final class MineboundScreen extends Screen {
     private static final int[] ENEMY_HEALTH = {28, 38, 54, 78, 102};
     private static final int ARENA_WIDTH = 236;
     private static final int ARENA_HEIGHT = 90;
-    private static final int PHASE_LENGTH = 135;
+    private static final int PHASE_LENGTH = 160;
+    private static final int HIT_INVULNERABILITY_TICKS = 12;
 
     private enum View { MAP, SKILLS, BATTLE, DODGE, RESULTS }
     private View view = View.MAP;
@@ -52,8 +53,8 @@ public final class MineboundScreen extends Screen {
     private float heartY = ARENA_HEIGHT * 0.75f;
     private String status = "Choose an unlocked stage.";
 
-    private record Bullet(float x, float y, float speed) {
-        Bullet advance() { return new Bullet(x, y + speed, speed); }
+    private record Bullet(float x, float y, float vx, float vy, int radius, int color) {
+        Bullet advance() { return new Bullet(x + vx, y + vy, vx, vy, radius, color); }
     }
 
     public MineboundScreen() {
@@ -189,39 +190,101 @@ public final class MineboundScreen extends Screen {
         navigate(View.RESULTS);
     }
 
+    private void launch(float x, float y, float vx, float vy, int radius, int color) {
+        bullets.add(new Bullet(x, y, vx, vy, radius, color));
+    }
+
+    /** Fires toward the heart's position at launch, not where it moves afterward. */
+    private void launchAimed(float x, float y, float speed, int color) {
+        float dx = heartX - x;
+        float dy = heartY - y;
+        float length = (float) Math.sqrt(dx * dx + dy * dy);
+        if (length > 0.001f) {
+            launch(x, y, dx / length * speed, dy / length * speed, 3, color);
+        }
+    }
+
+    /** Distinct, learnable bullet patterns spanning the FULL arena, even at stage 1. */
+    private void spawnDodgePattern() {
+        // Staggered falling pairs: use a volley counter and a coprime stride.
+        // The old phaseTicks multiplier made Briarling advance only 2px per
+        // volley, accidentally trapping all of its projectiles on the left.
+        int rainGap = Math.max(7, 12 - stage);
+        if (phaseTicks % rainGap == 0) {
+            int volley = phaseTicks / rainGap;
+            float x = 8 + (volley * 67 + stage * 29) % (ARENA_WIDTH - 16);
+            float speed = 2.9f + stage * 0.23f;
+            launch(x, -6, 0, speed, 3, RED);
+            if (stage > 0 || volley % 2 == 0) {
+                launch(ARENA_WIDTH - x, -12, 0, speed + 0.2f, 3, RED);
+            }
+        }
+
+        // Gold projectiles home in on the heart's location when fired.
+        // Moving after they launch is always a valid way to dodge them.
+        int aimedGap = Math.max(15, 25 - stage * 2);
+        if (phaseTicks % aimedGap == 0) {
+            int volley = phaseTicks / aimedGap;
+            float x = 12 + (volley * 89 + stage * 43) % (ARENA_WIDTH - 24);
+            launchAimed(x, -8, 3.25f + stage * 0.18f, GOLD);
+        }
+
+        // Crossfire forces movement vertically, instead of allowing players
+        // to camp between the vertical rain lanes. Alternate both entrances.
+        int sideGap = Math.max(12, 25 - stage * 3);
+        if (phaseTicks % sideGap == 0) {
+            int volley = phaseTicks / sideGap;
+            float lane = 10 + (volley * 29 + stage * 9) % (ARENA_HEIGHT - 20);
+            boolean fromLeft = volley % 2 == 0;
+            float horizontalSpeed = 3.6f + stage * 0.25f;
+            launch(fromLeft ? -7 : ARENA_WIDTH + 7, lane,
+                    fromLeft ? horizontalSpeed : -horizontalSpeed, 0, 3, FERN);
+            if (stage >= 2) {
+                launch(fromLeft ? ARENA_WIDTH + 7 : -7, ARENA_HEIGHT - lane,
+                        fromLeft ? -horizontalSpeed : horizontalSpeed, 0, 3, FERN);
+            }
+        }
+
+        // Briarling onward: occasional thorns aimed from either side.
+        if (stage >= 1 && phaseTicks % Math.max(20, 37 - stage * 3) == 0) {
+            int volley = phaseTicks / Math.max(20, 37 - stage * 3);
+            boolean fromLeft = volley % 2 == 0;
+            float y = 9 + (volley * 23 + stage * 13) % (ARENA_HEIGHT - 18);
+            launchAimed(fromLeft ? -8 : ARENA_WIDTH + 8, y,
+                    3.8f + stage * 0.2f, GOLD);
+        }
+    }
+
     @Override
     public void tick() {
         super.tick();
         if (view != View.DODGE) return;
 
         float velocity = 2.2f + profile.roguePassives * 0.05f;
-        if (left) heartX -= velocity;
-        if (right) heartX += velocity;
-        if (up) heartY -= velocity;
-        if (down) heartY += velocity;
-        heartX = Mth.clamp(heartX, 6, ARENA_WIDTH - 6);
-        heartY = Mth.clamp(heartY, 6, ARENA_HEIGHT - 6);
+        float moveX = (right ? 1 : 0) - (left ? 1 : 0);
+        float moveY = (down ? 1 : 0) - (up ? 1 : 0);
+        if (moveX != 0 && moveY != 0) {
+            moveX *= 0.70710677f;
+            moveY *= 0.70710677f;
+        }
+        heartX = Mth.clamp(heartX + moveX * velocity, 6, ARENA_WIDTH - 6);
+        heartY = Mth.clamp(heartY + moveY * velocity, 6, ARENA_HEIGHT - 6);
 
         phaseTicks++;
         if (iframe > 0) iframe--;
-        // Repeatable, visible patterns. No hidden RNG hit roll.
-        int gap = Math.max(7, 17 - stage * 2);
-        if (phaseTicks % gap == 0) {
-            float x = 6 + (phaseTicks * (23 + stage * 7) % (ARENA_WIDTH - 12));
-            bullets.add(new Bullet(x, 0, 1.7f + stage * 0.35f));
-            if (stage >= 2 && phaseTicks % (gap * 2) == 0) {
-                bullets.add(new Bullet(ARENA_WIDTH - x, 0, 1.5f + stage * 0.35f));
-            }
-        }
+        spawnDodgePattern();
 
         List<Bullet> next = new ArrayList<>();
         for (Bullet b : bullets) {
             Bullet moved = b.advance();
-            if (moved.y > ARENA_HEIGHT + 4) continue;
+            if (moved.x < -12 || moved.x > ARENA_WIDTH + 12
+                    || moved.y < -16 || moved.y > ARENA_HEIGHT + 12) continue;
             next.add(moved);
-            if (iframe == 0 && Math.abs(moved.x - heartX) < 6 && Math.abs(moved.y - heartY) < 6) {
+            float collisionRadius = moved.radius + 4f;
+            if (iframe == 0 && Math.abs(moved.x - heartX) < collisionRadius
+                    && Math.abs(moved.y - heartY) < collisionRadius) {
                 hp = Math.max(0, hp - (defending ? 3 : 8));
-                iframe = 15;
+                iframe = HIT_INVULNERABILITY_TICKS;
                 if (hp == 0) {
                     finish(false);
                     return;
@@ -408,7 +471,8 @@ public final class MineboundScreen extends Screen {
                 arenaY + ARENA_HEIGHT, INK);
         for (Bullet bullet : bullets) {
             int bx = arenaX + Math.round(bullet.x), by = arenaY + Math.round(bullet.y);
-            gfx.fill(bx - 3, by - 3, bx + 3, by + 3, RED);
+            gfx.fill(bx - bullet.radius, by - bullet.radius,
+                    bx + bullet.radius, by + bullet.radius, bullet.color);
         }
         if (iframe % 4 < 2) {
             int hx = arenaX + Math.round(heartX), hy = arenaY + Math.round(heartY);
